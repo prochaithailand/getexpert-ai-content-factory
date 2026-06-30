@@ -54,3 +54,29 @@
 * **Retry Count:** อัปเดตระบุรอบการลองทำงานใหม่ (0 กรณีปกติสำเร็จ, 3 กรณีล้มเหลว)
 * **Last Error:** บันทึกแสดงสาเหตุปัญหาเมื่อแถวพัง
 * **Processed At:** บันทึกเวลาที่ประมวลผลเสร็จสิ้น
+## Sprint 2 Runtime Test Result
+
+Test date: 2026-06-30
+
+Result: PASSED
+
+Summary:
+- Total topics tested: 3
+- Blogger drafts created: 3
+- Google Sheets updated successfully
+- SEO Title generated
+- Meta Description generated
+- Slug Suggestion generated
+- Focus Keyword generated
+- Related Keywords generated
+- Content Summary generated
+- Featured Image Prompt generated
+- Image Style generated
+- Image Concept generated
+- Retry Count recorded
+- Processed At recorded
+- Updated At recorded
+- Last Error remained empty
+
+Conclusion:
+Sprint 2 Runtime Test passed successfully. The system can process real Google Sheets rows, generate SEO content with Gemini, create Blogger drafts, and update Google Sheets with SEO metadata and Featured Image Prompt fields.
