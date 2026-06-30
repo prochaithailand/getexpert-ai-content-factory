@@ -3,8 +3,9 @@ from google import genai
 from google.genai import types
 
 from config.settings import Settings
-from models.content_models import GeneratedContent
+from models.content_models import SEOContent
 from prompts.blogger_seo_prompt import get_blogger_seo_prompt
+from utils.retry import retry
 
 class GeminiService:
     """
@@ -15,24 +16,24 @@ class GeminiService:
         self.model_name = Settings.GEMINI_MODEL
         if not self.api_key:
             raise ValueError("กรุณาระบุ GEMINI_API_KEY ในไฟล์ .env")
-        # เริ่มต้นโมดูล GenAI Client
         self.client = genai.Client(api_key=self.api_key)
 
-    def generate_blogger_article(self, topic: str, keyword: str) -> GeneratedContent:
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def generate_blogger_article(self, topic: str, keyword: str) -> SEOContent:
         """
-        เรียกใช้งานโมเดล Gemini เพื่อเขียนบทความตามคำสั่งระบุโครงสร้าง JSON
+        เรียกใช้งานโมเดล Gemini เพื่อเขียนบทความและส่งผลลัพธ์เป็นโครงสร้าง JSON (SEOContent)
         """
         prompt = get_blogger_seo_prompt(topic, keyword)
         logging.info(f"กำลังส่งสัญญานเรียกเขียนบทความไปยัง Gemini Model: '{self.model_name}'...")
         
         try:
-            # ยิงเรียก Gemini API พร้อมบีบบังคับโครงสร้างการตอบกลับผ่าน Pydantic Model (GeneratedContent)
+            # ยิงเรียก Gemini API พร้อมบีบบังคับโครงสร้างการตอบกลับผ่าน Pydantic Model (SEOContent)
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=GeneratedContent,
+                    response_schema=SEOContent,
                 ),
             )
             
@@ -40,7 +41,7 @@ class GeminiService:
             logging.info("Gemini API เขียนบทความประมวลผลเสร็จสิ้นและส่งข้อมูลกลับมา")
             
             # ถอดรหัสโครงสร้างและส่งกลับเป็น Pydantic Model วัตถุประมวลผล
-            return GeneratedContent.model_validate_json(result_json)
+            return SEOContent.model_validate_json(result_json)
             
         except Exception as e:
             logging.error(f"การเรียกเขียนบทความผ่าน Gemini API เกิดข้อผิดพลาด: {e}")

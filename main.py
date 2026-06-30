@@ -11,10 +11,7 @@ def setup_logging():
     ตั้งค่าระบบการบันทึกประวัติการทำงาน (Logging) 
     บันทึกลงไฟล์ logs/app.log และแสดงผลใน Terminal พร้อมกัน
     """
-    # สร้างโฟลเดอร์ logs หากไม่มี
     os.makedirs("logs", exist_ok=True)
-    
-    # อ่านค่า Log Level จากคอนฟิก
     log_level_str = Settings.LOG_LEVEL.upper()
     log_level = getattr(logging, log_level_str, logging.INFO)
     
@@ -38,7 +35,7 @@ def main():
     # 2. เริ่มทำงานการตั้งค่า Log
     setup_logging()
     logging.info("==================================================")
-    logging.info("เริ่มต้นการรันระบบ GetExpert AI Content Factory - Sprint 1")
+    logging.info("เริ่มต้นการรันระบบ GetExpert AI Content Factory - Sprint 2")
     logging.info("==================================================")
 
     # 3. เริ่มต้นทำงานเปิดคลาสเซอร์วิส (Services Initialization)
@@ -50,7 +47,7 @@ def main():
         logging.critical(f"ไม่สามารถเริ่มใช้งานเซอร์วิส Google/Gemini ได้: {e}")
         return
 
-    # 4. อ่านหัวข้อรอประมวลผลจาก Google Sheets
+    # 4. อ่านหัวข้อรอประมวลผลจาก Google Sheets (ดึงคอลัมน์ A:T)
     try:
         waiting_rows = sheets_service.read_waiting_rows()
     except Exception as e:
@@ -77,19 +74,36 @@ def main():
             continue
 
         try:
-            # 5.2 ส่งหัวข้อและคำสำคัญไปแต่งผ่าน Gemini API (Structured Output)
-            article = gemini_service.generate_blogger_article(topic, keyword)
+            # 5.2 ส่งหัวข้อและคำสำคัญไปแต่งผ่าน Gemini API (Structured Output - SEOContent)
+            seo_content = gemini_service.generate_blogger_article(topic, keyword)
             
-            # 5.3 ส่งเนื้อหา HTML และชื่อหัวข้อไปอัปโหลดขึ้น Blogger แบบร่าง (Draft)
-            post_result = blogger_service.create_draft_post(article.title, article.html_content)
+            # 5.3 รวบรวมข้อมูล HTML สำหรับ Blogger (เนื้อหาหลัก + FAQ + CTA)
+            # สร้าง FAQ HTML
+            faq_html = ""
+            if seo_content.faq:
+                faq_html = "<h2>คำถามที่พบบ่อย (FAQ)</h2><ul>"
+                for item in seo_content.faq:
+                    faq_html += f"<li><strong>{item.question}</strong><br/>{item.answer}</li>"
+                faq_html += "</ul>"
             
-            # 5.4 อัปเดตข้อมูลผลลัพธ์ลง Google Sheets ปรับสถานะเป็น 'Drafted'
+            # สร้าง CTA HTML
+            cta_html = ""
+            if seo_content.call_to_action:
+                cta_html = f"<div class='cta-section' style='margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-left: 5px solid #007bff;'><p>{seo_content.call_to_action}</p></div>"
+            
+            # รวมโค้ด HTML ทั้งหมดที่จะส่งเข้า Blogger
+            full_html = seo_content.article_html + faq_html + cta_html
+            
+            # 5.4 ส่งเนื้อหา HTML และชื่อหัวข้อไปอัปโหลดขึ้น Blogger แบบร่าง (Draft)
+            post_result = blogger_service.create_draft_post(seo_content.title, full_html)
+            
+            # 5.5 อัปเดตข้อมูลผลลัพธ์ลง Google Sheets ปรับสถานะเป็น 'Drafted' (Retry Count = 0)
             sheets_service.update_row_success(
                 row_idx=row_idx,
-                title=article.title,
-                meta=article.meta_description,
+                seo_content=seo_content,
                 post_id=post_result.post_id,
-                url=post_result.url
+                url=post_result.url,
+                retry_count=0
             )
             logging.info(f"ทำรายการแถวที่ {row_idx} สำเร็จลุล่วงแล้ว!")
             
@@ -97,16 +111,16 @@ def main():
             error_msg = str(e)
             logging.error(f"การประมวลผลแถวที่ {row_idx} ล้มเหลวเนื่องจาก: {error_msg}")
             
-            # 5.5 อัปเดตข้อผิดพลาดและเปลี่ยนสถานะเป็น 'Error' ในชีต
+            # 5.6 อัปเดตข้อผิดพลาดและเปลี่ยนสถานะเป็น 'Failed' ในชีต บันทึก Retry Count = 3
             try:
-                sheets_service.update_row_error(row_idx, error_msg)
+                sheets_service.update_row_failed(row_idx, error_msg, retry_count=3)
             except Exception as sheet_err:
                 logging.error(f"การบันทึกแจ้ง Error ในแถวที่ {row_idx} ผิดพลาด: {sheet_err}")
 
         # เว้นวรรคการรันเพื่อเลี่ยงปัญหาความถี่ปัญญาประดิษฐ์และ API
         time.sleep(3)
 
-    logging.info("สิ้นสุดการทำงานระบบ AI Blogger Automation รายวันประจำ Sprint 1")
+    logging.info("สิ้นสุดการทำงานระบบ AI Blogger Automation รายวันประจำ Sprint 2")
 
 if __name__ == "__main__":
     main()

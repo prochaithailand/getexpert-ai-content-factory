@@ -3,6 +3,7 @@ from googleapiclient.discovery import build
 from config.settings import Settings
 from services.sheets_service import get_google_credentials
 from models.content_models import BloggerPostResult
+from utils.retry import retry
 
 class BloggerService:
     """
@@ -15,6 +16,7 @@ class BloggerService:
         if not self.blog_id:
             raise ValueError("กรุณาระบุ BLOGGER_BLOG_ID ในไฟล์ .env")
 
+    @retry(max_retries=3, delays=[2, 5, 10])
     def create_draft_post(self, title: str, html_content: str) -> BloggerPostResult:
         """
         สร้างโพสต์บทความใหม่บน Blogger ในรูปแบบแบบร่าง (Draft)
