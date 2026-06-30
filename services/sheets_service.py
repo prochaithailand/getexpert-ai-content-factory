@@ -227,3 +227,133 @@ class SheetsService:
         except Exception as e:
             logging.error(f"ไม่สามารถเขียนสถานะความล้มเหลวของแถวที่ {row_idx} ลงชีตได้: {e}")
             raise e
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def add_new_row(self, topic: str, keyword: str) -> int:
+        """
+        เพิ่มหัวข้อบทความและคีย์เวิร์ดแถวใหม่ลงใน Google Sheet (สำหรับ Web App ป้อนข้อมูล)
+        """
+        # อ่านข้อมูลคอลัมน์ A เพื่อคำนวณหา ID ถัดไป
+        range_name = f"{self.sheet_name}!A:A"
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=self.spreadsheet_id, range=range_name).execute()
+        values = result.get('values', [])
+        
+        new_id = 1
+        new_row_idx = 2
+        if values and len(values) > 1:
+            new_row_idx = len(values) + 1
+            try:
+                last_id = int(values[-1][0])
+                new_id = last_id + 1
+            except (ValueError, IndexError):
+                new_id = len(values)
+                
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # เตรียมชุดข้อมูล 20 คอลัมน์ (A:T)
+        # ID, Topic, Keyword, Status=Waiting, ..., Created At, Updated At
+        row_data = [
+            str(new_id),         # A: ID
+            topic,               # B: Topic
+            keyword,             # C: Keyword
+            "Waiting",           # D: Status
+            "", "", "", "", "", "", "", "", "", "", "", "", "", "", # E to R
+            now_str,             # S: Created At
+            now_str              # T: Updated At
+        ]
+        
+        write_range = f"{self.sheet_name}!A{new_row_idx}:T{new_row_idx}"
+        self.service.spreadsheets().values().update(
+            spreadsheetId=self.spreadsheet_id,
+            range=write_range,
+            valueInputOption="RAW",
+            body={"values": [row_data]}
+        ).execute()
+        
+        logging.info(f"เพิ่มหัวข้อใหม่แถวที่ {new_row_idx} (ID: {new_id}) ลงชีตเรียบร้อยแล้ว")
+        return new_row_idx
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def get_row_by_index(self, row_idx: int) -> SheetRow:
+        """
+        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx)
+        """
+        range_name = f"{self.sheet_name}!A{row_idx}:T{row_idx}"
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=self.spreadsheet_id, range=range_name).execute()
+        values = result.get('values', [])
+        
+        if not values:
+            raise ValueError(f"ไม่พบข้อมูลในแถวที่ {row_idx}")
+            
+        padded = values[0] + [''] * (20 - len(values[0]))
+        return SheetRow(
+            row_idx=row_idx,
+            id=padded[0],
+            topic=padded[1],
+            keyword=padded[2],
+            status=padded[3],
+            seo_title=padded[4],
+            meta_description=padded[5],
+            blogger_post_id=padded[6],
+            blogger_url=padded[7],
+            slug_suggestion=padded[8],
+            focus_keyword=padded[9],
+            related_keywords=padded[10],
+            content_summary=padded[11],
+            featured_image_prompt=padded[12],
+            image_style=padded[13],
+            image_concept=padded[14],
+            retry_count=padded[15],
+            last_error=padded[16],
+            processed_at=padded[17],
+            created_at=padded[18],
+            updated_at=padded[19]
+        )
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def read_all_rows(self) -> List[SheetRow]:
+        """
+        ดึงข้อมูลทุกแถวเพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
+        """
+        range_name = f"{self.sheet_name}!A:T"
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id, range=range_name).execute()
+        except Exception as e:
+            logging.error(f"ดึงข้อมูลคิวงานทั้งหมดไม่สำเร็จ: {e}")
+            raise e
+
+        values = result.get('values', [])
+        if not values or len(values) <= 1:
+            return []
+
+        all_rows = []
+        for idx, row in enumerate(values[1:], start=2):
+            padded = row + [''] * (20 - len(row))
+            sheet_row = SheetRow(
+                row_idx=idx,
+                id=padded[0],
+                topic=padded[1],
+                keyword=padded[2],
+                status=padded[3],
+                seo_title=padded[4],
+                meta_description=padded[5],
+                blogger_post_id=padded[6],
+                blogger_url=padded[7],
+                slug_suggestion=padded[8],
+                focus_keyword=padded[9],
+                related_keywords=padded[10],
+                content_summary=padded[11],
+                featured_image_prompt=padded[12],
+                image_style=padded[13],
+                image_concept=padded[14],
+                retry_count=padded[15],
+                last_error=padded[16],
+                processed_at=padded[17],
+                created_at=padded[18],
+                updated_at=padded[19]
+            )
+            all_rows.append(sheet_row)
+        return all_rows
