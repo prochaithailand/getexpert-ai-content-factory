@@ -1,0 +1,21 @@
+# Python standard ignores
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Environment and sensitive keys
+.env
+credentials.json
+token.json
+
+# Logs
+*.log
+logs/
+
+# IDE settings
+.vscode/
+.idea/
