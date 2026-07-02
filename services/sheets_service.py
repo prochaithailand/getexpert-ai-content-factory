@@ -26,6 +26,24 @@ def get_google_credentials():
     creds_file = Settings.GOOGLE_CREDENTIALS_FILE
     token_file = Settings.GOOGLE_TOKEN_FILE
     
+    # หากพบความลับ Google Credentials JSON ในระบบ ให้เขียนใส่ไฟล์เป้าหมาย
+    if Settings.GOOGLE_CREDENTIALS_JSON:
+        try:
+            with open(creds_file, 'w', encoding='utf-8') as f:
+                f.write(Settings.GOOGLE_CREDENTIALS_JSON.strip())
+            logging.info(f"ดึงข้อมูลลับ GOOGLE_CREDENTIALS_JSON และเขียนไฟล์ {creds_file} เรียบร้อยแล้ว")
+        except Exception as e:
+            logging.error(f"ไม่สามารถเขียนไฟล์สิทธิ์ Google Credentials ชั่วคราวได้: {e}")
+
+    # หากพบความลับ Google Token JSON ในระบบ และยังไม่มีไฟล์ Token ให้เขียนใส่ไฟล์
+    if Settings.GOOGLE_TOKEN_JSON and not os.path.exists(token_file):
+        try:
+            with open(token_file, 'w', encoding='utf-8') as f:
+                f.write(Settings.GOOGLE_TOKEN_JSON.strip())
+            logging.info(f"ดึงข้อมูลลับ GOOGLE_TOKEN_JSON และเขียนไฟล์ {token_file} เรียบร้อยแล้ว")
+        except Exception as e:
+            logging.error(f"ไม่สามารถเขียนไฟล์ล็อกอิน Google Token ชั่วคราวได้: {e}")
+    
     if os.path.exists(token_file):
         try:
             creds = Credentials.from_authorized_user_file(token_file, SCOPES)
@@ -43,9 +61,10 @@ def get_google_credentials():
                 
         if not creds:
             if not os.path.exists(creds_file):
-                logging.error(f"ไม่พบไฟล์ Credentials {creds_file}")
+                err_msg = f"ไม่พบไฟล์คีย์ {creds_file} และไม่พบตัวแปร GOOGLE_CREDENTIALS_JSON ในความลับระบบ (Secrets)"
+                logging.error(err_msg)
                 raise FileNotFoundError(
-                    f"ไม่พบไฟล์ {creds_file} กรุณาดาวน์โหลดและติดตั้งไฟล์คีย์จาก Google Cloud"
+                    f"{err_msg} กรุณาดาวน์โหลดไฟล์คีย์หรือป้อนสิทธิ์เข้าถึงลงในระบบคอนฟิกของเซิร์ฟเวอร์"
                 )
             logging.info("กำลังขออนุญาตเข้าใช้สิทธิ์บัญชี Google ผ่านเว็บบราวเซอร์...")
             flow = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)

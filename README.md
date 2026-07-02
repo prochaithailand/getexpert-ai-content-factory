@@ -136,3 +136,47 @@
    ```
 2. หน้าจอเว็บจะปรับเป็นโหมดเดโมสำหรับลูกค้าทันที (ซ่อนส่วนตารางคิวงานและแดชบอร์ดผู้ดูแลระบบทั้งหมด)
 3. เมื่อป้อนข้อมูลแบรนด์และกดปุ่ม **🚀 สร้าง Content Pack ทันที** ระบบจะใช้บริการประมวลผลทันที (Synchronous Generation) โดยเรียก Gemini API และ Blogger API เพื่อสร้างและแสดงผลบทความพร้อมโซเชียลโพสต์และสคริปต์ 5 แท็บแบบเรียลไทม์ภายใน 15-20 วินาที เพื่อการทดลองใช้ที่สะดวกรวดเร็วที่สุดครับ
+
+---
+
+### 8. การติดตั้งใช้งานบน Streamlit Cloud (Streamlit Secrets)
+เพื่อความปลอดภัย ข้อมูลความลับ `credentials.json` และ `token.json` ต้องห้ามถูกกด Commit บันทึกขึ้นบน GitHub โดยเด็ดขาด เมื่อทำการ Deploy ระบบบน **Streamlit Cloud** ให้เข้าไปตั้งค่าข้อมูลที่ความลับระบบผ่านหน้าต่างเมนู **App settings > Secrets** และคัดลอกข้อมูลในรูปแบบดังนี้:
+
+```toml
+GEMINI_API_KEY = "ป้อน API Key ของคุณ"
+GEMINI_MODEL = "gemini-2.5-flash"
+GOOGLE_SHEET_ID = "ป้อน Spreadsheet ID ของคุณ"
+GOOGLE_SHEET_NAME = "Sheet1"
+BLOGGER_BLOG_ID = "ป้อน Blogger Blog ID ของคุณ"
+
+# คัดลอกข้อความในไฟล์ credentials.json ทั้งหมดมาแปะในช่องนี้
+GOOGLE_CREDENTIALS_JSON = """
+{
+  "web": {
+    "client_id": "...",
+    "project_id": "...",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_secret": "...",
+    "redirect_uris": ["http://localhost:59938/"]
+  }
+}
+"""
+
+# คัดลอกข้อความในไฟล์ token.json ทั้งหมดมาแปะในช่องนี้
+GOOGLE_TOKEN_JSON = """
+{
+  "token": "...",
+  "refresh_token": "...",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "client_id": "...",
+  "client_secret": "...",
+  "scopes": ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/blogger"],
+  "universe_domain": "googleapis.com",
+  "expiry": "2026-07-02T10:00:00.000000Z"
+}
+"""
+
+LOG_LEVEL = "INFO"
+```
