@@ -9,6 +9,7 @@ from services.sheets_service import SheetsService
 from services.gemini_service import GeminiService
 from services.blogger_service import BloggerService
 from services.blueprint_service import BlueprintService
+from utils.sanitize import strip_html_tags
 
 # กำหนดหน้าจอหลักของ Streamlit
 st.set_page_config(
@@ -53,20 +54,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ฟังก์ชันกำจัด HTML สำหรับจัดทำสำเนาบทความ (Plain Text)
-def strip_html_tags(html_text: str) -> str:
-    """
-    ล้างรหัส HTML tags ออกทั้งหมดเพื่อให้เหลือเฉพาะข้อความธรรมดา (Plain Text)
-    """
-    if not html_text:
-        return ""
-    # แทนที่แท็กขึ้นบรรทัดใหม่ด้วย \n
-    text = re.sub(r'</?(p|br|div|li|h1|h2|h3|h4|h5|h6)[^>]*>', '\n', html_text)
-    # ลบแท็กอื่นๆ ที่เหลือ
-    text = re.sub(r'<[^>]+>', '', text)
-    # จัดการการเว้นวรรคบรรทัดใหม่
-    text = re.sub(r'\n\s*\n', '\n\n', text)
-    return text.strip()
+# (ฟังก์ชัน strip_html_tags ได้รับการอิมพอร์ตมาจาก utils.sanitize เรียบร้อยแล้ว)
 
 # เริ่มต้นเรียกเซอร์วิส Sheets
 @st.cache_resource
@@ -351,15 +339,15 @@ if is_demo:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy มุมขวาบนของกล่องข้อความดิบ หรือก๊อปปี้ HTML ด้านล่างสุด)")
                     st.markdown(f"##### 📋 คัดลอก{outputs_map.get('seo_article', 'บทความทั้งหมด')} (ข้อความธรรมดา)")
                     clean_text = strip_html_tags(res['article_html'])
-                    full_copyable_text = f"หัวข้อ (Title): {res['seo_title']}\nคำโปรย (Meta Description): {res['meta_description']}\n\n{clean_text}"
+                    full_copyable_text = f"หัวข้อ (Title): {strip_html_tags(res['seo_title'])}\nคำโปรย (Meta Description): {strip_html_tags(res['meta_description'])}\n\n{clean_text}"
                     st.code(full_copyable_text, language=None)
                     
                     st.write("---")
-                    st.write(f"**SEO Title:** {res['seo_title']}")
-                    st.write(f"**Meta Description:** {res['meta_description']}")
-                    st.write(f"**Slug (URL แนะนำ):** `{res['slug_suggestion']}`")
-                    st.write(f"**Focus Keyword:** {res['focus_keyword']}")
-                    st.write(f"**Summary:** {res['content_summary']}")
+                    st.write(f"**SEO Title:** {strip_html_tags(res['seo_title'])}")
+                    st.write(f"**Meta Description:** {strip_html_tags(res['meta_description'])}")
+                    st.write(f"**Slug (URL แนะนำ):** `{strip_html_tags(res['slug_suggestion'])}`")
+                    st.write(f"**Focus Keyword:** {strip_html_tags(res['focus_keyword'])}")
+                    st.write(f"**Summary:** {strip_html_tags(res['content_summary'])}")
                     
                     st.write("---")
                     st.markdown("##### 👀 ตัวอย่างหน้าตาบทความ (Formatted Preview)")
@@ -372,28 +360,28 @@ if is_demo:
                 with tab_facebook:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนของกล่องรหัส)")
                     st.markdown(f"**ข้อความโพสต์ประชาสัมพันธ์ ({outputs_map.get('facebook_post', 'Social Post')}):**")
-                    st.code(res['facebook_post'], language=None)
-                    st.write(f"**แฮชแท็กแนะนำ:** {res['facebook_hashtags']}")
+                    st.code(strip_html_tags(res['facebook_post']), language=None)
+                    st.write(f"**แฮชแท็กแนะนำ:** {strip_html_tags(res['facebook_hashtags'])}")
                     
                 with tab_tiktok:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนของกล่องรหัสเพื่อคัดลอกสคริปต์)")
-                    st.markdown(f"🔥 **TikTok Hook ดึงดูดสายตา:** *\"{res['tiktok_hook']}\"*")
+                    st.markdown(f"🔥 **TikTok Hook ดึงดูดสายตา:** *\"{strip_html_tags(res['tiktok_hook'])}\"*")
                     st.markdown(f"**{outputs_map.get('tiktok_script', 'สคริปต์สั้นบทพูดและแนวภาพ TikTok')}:**")
-                    st.code(res['tiktok_script'], language=None)
+                    st.code(strip_html_tags(res['tiktok_script']), language=None)
                     
                 with tab_youtube:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนเพื่อคัดลอกสคริปต์)")
-                    st.write(f"🎥 **{outputs_map.get('youtube_script', 'YouTube Shorts Title')}:** {res['youtube_title']}")
-                    st.write(f"**คำอธิบายและสรุป:** {res['youtube_description']}")
+                    st.write(f"🎥 **{outputs_map.get('youtube_script', 'YouTube Shorts Title')}:** {strip_html_tags(res['youtube_title'])}")
+                    st.write(f"**คำอธิบายและสรุป:** {strip_html_tags(res['youtube_description'])}")
                     st.markdown(f"**{outputs_map.get('youtube_script', 'สคริปต์สำหรับวิดีโอ YouTube Shorts')}:**")
-                    st.code(res['youtube_shorts_script'], language=None)
+                    st.code(strip_html_tags(res['youtube_shorts_script']), language=None)
                     
                 with tab_image:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy มุมขวาเพื่อนำคำสั่งไปส่ง AI วาดภาพ)")
                     st.markdown(f"**{outputs_map.get('image_prompt', 'Featured Image Prompt')}:**")
-                    st.code(res['featured_image_prompt'], language=None)
-                    st.write(f"**Image Style:** {res['image_style']}")
-                    st.write(f"**Concept:** {res['image_concept']}")
+                    st.code(strip_html_tags(res['featured_image_prompt']), language=None)
+                    st.write(f"**Image Style:** {strip_html_tags(res['image_style'])}")
+                    st.write(f"**Concept:** {strip_html_tags(res['image_concept'])}")
             else:
                 # Empty State (ก่อนลูกค้ากดเจนเนื้อหา)
                 st.markdown("""
@@ -601,34 +589,34 @@ else:
                         with tab_blogger:
                             st.markdown(f"🔗 **Blogger Draft URL:** [คลิกเปิดร่างบทความใน Blogger]({row_data.blogger_url})")
                             st.write(f"**Blogger Post ID:** `{row_data.blogger_post_id}`")
-                            st.write(f"**SEO Title:** {row_data.seo_title}")
-                            st.write(f"**Meta Description:** {row_data.meta_description}")
-                            st.write(f"**Slug Recommendation:** `{row_data.slug_suggestion}`")
-                            st.write(f"**Focus Keyword:** {row_data.focus_keyword}")
-                            st.write(f"**Related Keywords:** {row_data.related_keywords}")
-                            st.write(f"**Content Summary:** {row_data.content_summary}")
+                            st.write(f"**SEO Title:** {strip_html_tags(row_data.seo_title)}")
+                            st.write(f"**Meta Description:** {strip_html_tags(row_data.meta_description)}")
+                            st.write(f"**Slug Recommendation:** `{strip_html_tags(row_data.slug_suggestion)}`")
+                            st.write(f"**Focus Keyword:** {strip_html_tags(row_data.focus_keyword)}")
+                            st.write(f"**Related Keywords:** {strip_html_tags(row_data.related_keywords)}")
+                            st.write(f"**Content Summary:** {strip_html_tags(row_data.content_summary)}")
                             
                         with tab_facebook:
                             st.markdown(f"**โพสต์แนะนำประชาสัมพันธ์ ({row_outputs.get('facebook_post', 'Social Post')}):**")
-                            st.code(row_data.facebook_post, language=None)
-                            st.write(f"**แนะนำแฮชแท็ก:** {row_data.facebook_hashtags}")
+                            st.code(strip_html_tags(row_data.facebook_post), language=None)
+                            st.write(f"**แนะนำแฮชแท็ก:** {strip_html_tags(row_data.facebook_hashtags)}")
                             
                         with tab_tiktok:
-                            st.markdown(f"🔥 **TikTok Hook (3 วินาทีแรก):** *\"{row_data.tiktok_hook}\"*")
+                            st.markdown(f"🔥 **TikTok Hook (3 วินาทีแรก):** *\"{strip_html_tags(row_data.tiktok_hook)}\"*")
                             st.markdown(f"**{row_outputs.get('tiktok_script', 'สคริปต์สั้นบทพูดและแนวภาพ TikTok')}:**")
-                            st.code(row_data.tiktok_script, language=None)
+                            st.code(strip_html_tags(row_data.tiktok_script), language=None)
                             
                         with tab_youtube:
-                            st.write(f"🎥 **{row_outputs.get('youtube_script', 'YouTube Shorts Title')}:** {row_data.youtube_title}")
-                            st.write(f"**คำอธิบายสรุปข่าว:** {row_data.youtube_description}")
+                            st.write(f"🎥 **{row_outputs.get('youtube_script', 'YouTube Shorts Title')}:** {strip_html_tags(row_data.youtube_title)}")
+                            st.write(f"**คำอธิบายสรุปข่าว:** {strip_html_tags(row_data.youtube_description)}")
                             st.markdown(f"**{row_outputs.get('youtube_script', 'สคริปต์วิดีโอ YouTube Shorts')}:**")
-                            st.code(row_data.youtube_shorts_script, language=None)
+                            st.code(strip_html_tags(row_data.youtube_shorts_script), language=None)
                             
                         with tab_image:
                             st.markdown(f"**{row_outputs.get('image_prompt', 'Featured Image Prompt')}:**")
-                            st.code(row_data.featured_image_prompt, language=None)
-                            st.write(f"**Image Style:** {row_data.image_style}")
-                            st.write(f"**Image Concept:** {row_data.image_concept}")
+                            st.code(strip_html_tags(row_data.featured_image_prompt), language=None)
+                            st.write(f"**Image Style:** {strip_html_tags(row_data.image_style)}")
+                            st.write(f"**Image Concept:** {strip_html_tags(row_data.image_concept)}")
                             
                     elif status_lower == "failed":
                         st.error(f"❌ การทำงานขัดข้องหลังพยายาม Retry ครบกำหนด: {row_data.last_error}")

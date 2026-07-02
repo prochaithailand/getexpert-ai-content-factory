@@ -71,5 +71,25 @@ class TestAIContentBlueprints(unittest.TestCase):
         self.assertIn("GetExpert Fitness", context_str)
         self.assertNotIn("ค่าอื่นๆ", context_str)
 
+    def test_strip_html_tags_sanitization(self):
+        """
+        ทดสอบว่าฟังก์ชัน strip_html_tags ทำการแกะแท็ก HTML และล้างออกได้อย่างหมดจด
+        """
+        from utils.sanitize import strip_html_tags
+        
+        # ข้อความที่มีแท็ก HTML ปะปน
+        html_input = "<strong>อบต.บางรัก</strong> ขอเชิญร่วม <p>โครงการแยกขยะ</p> เพื่อชุมชน <br/> สะอาด"
+        sanitized = strip_html_tags(html_input)
+        
+        # ตรวจสอบว่าไม่มีเครื่องหมาย tag เหลืออยู่
+        self.assertNotIn("<strong>", sanitized)
+        self.assertNotIn("</strong>", sanitized)
+        self.assertNotIn("<p>", sanitized)
+        self.assertNotIn("</p>", sanitized)
+        self.assertNotIn("<br/>", sanitized)
+        self.assertNotIn("<br>", sanitized)
+        self.assertIn("อบต.บางรัก", sanitized)
+        self.assertIn("โครงการแยกขยะ", sanitized)
+
 if __name__ == "__main__":
     unittest.main()

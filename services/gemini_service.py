@@ -86,8 +86,38 @@ class GeminiService:
             result_json = response.text
             logging.info("Gemini API เขียนบทความประมวลผลเสร็จสิ้นและส่งข้อมูลกลับมา")
             
-            # ถอดรหัสโครงสร้างและส่งกลับเป็น Pydantic Model วัตถุประมวลผล
-            return SEOContent.model_validate_json(result_json)
+            # ถอดรหัสโครงสร้าง
+            seo_content = SEOContent.model_validate_json(result_json)
+            
+            # ล้างแท็ก HTML ที่ต้นทางสำหรับข้อมูลข้อความทั้งหมด
+            from utils.sanitize import strip_html_tags
+            
+            seo_content.seo_title = strip_html_tags(seo_content.seo_title)
+            seo_content.meta_description = strip_html_tags(seo_content.meta_description)
+            seo_content.slug_suggestion = strip_html_tags(seo_content.slug_suggestion)
+            seo_content.focus_keyword = strip_html_tags(seo_content.focus_keyword)
+            seo_content.content_summary = strip_html_tags(seo_content.content_summary)
+            
+            if seo_content.related_keywords:
+                seo_content.related_keywords = [strip_html_tags(kw) for kw in seo_content.related_keywords]
+                
+            if seo_content.social_pack:
+                sp = seo_content.social_pack
+                sp.facebook_post = strip_html_tags(sp.facebook_post)
+                sp.facebook_hashtags = [strip_html_tags(ht) for ht in sp.facebook_hashtags] if sp.facebook_hashtags else []
+                sp.tiktok_hook = strip_html_tags(sp.tiktok_hook)
+                sp.tiktok_script = strip_html_tags(sp.tiktok_script)
+                sp.youtube_shorts_script = strip_html_tags(sp.youtube_shorts_script)
+                sp.youtube_title = strip_html_tags(sp.youtube_title)
+                sp.youtube_description = strip_html_tags(sp.youtube_description)
+                
+            if seo_content.featured_image:
+                fi = seo_content.featured_image
+                fi.prompt = strip_html_tags(fi.prompt)
+                fi.style = strip_html_tags(fi.style)
+                fi.concept = strip_html_tags(fi.concept)
+                
+            return seo_content
             
         except Exception as e:
             logging.error(f"การเรียกเขียนบทความผ่าน Gemini API เกิดข้อผิดพลาด: {e}")
