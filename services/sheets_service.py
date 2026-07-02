@@ -89,9 +89,9 @@ class SheetsService:
     @retry(max_retries=3, delays=[2, 5, 10])
     def read_waiting_rows(self) -> List[SheetRow]:
         """
-        ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:AE (31 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
+        ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:AI (35 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
         """
-        range_name = f"{self.sheet_name}!A:AE"
+        range_name = f"{self.sheet_name}!A:AI"
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range=range_name).execute()
@@ -105,8 +105,8 @@ class SheetsService:
 
         waiting_rows = []
         for idx, row in enumerate(values[1:], start=2):
-            # เติมแถวให้ครบ 31 คอลัมน์เพื่อความปลอดภัยย้อนหลังและป้องกัน Index Error
-            padded = row + [''] * (31 - len(row))
+            # เติมแถวให้ครบ 35 คอลัมน์เพื่อความปลอดภัยย้อนหลังและป้องกัน Index Error
+            padded = row + [''] * (35 - len(row))
             status = padded[3].strip() if padded[3] else ""
             
             if status.lower() == 'waiting':
@@ -143,7 +143,12 @@ class SheetsService:
                     tiktok_script=padded[27],
                     youtube_shorts_script=padded[28],
                     youtube_title=padded[29],
-                    youtube_description=padded[30]
+                    youtube_description=padded[30],
+                    # ฟิลด์ใหม่ของ Sprint 5
+                    content_type=padded[31] if padded[31] else "business",
+                    blueprint_label=padded[32],
+                    blueprint_inputs_json=padded[33] if padded[33] else "{}",
+                    output_types_list=padded[34]
                 )
                 waiting_rows.append(sheet_row)
         
@@ -289,10 +294,14 @@ class SheetsService:
         target_audience: str = "",
         business_type: str = "",
         content_goal: str = "",
-        tone: str = ""
+        tone: str = "",
+        content_type: str = "business",
+        blueprint_label: str = "",
+        blueprint_inputs_json: str = "{}",
+        output_types_list: str = ""
     ) -> int:
         """
-        เพิ่มหัวข้อบทความและคำสั่งรายละเอียดใหม่ลงใน Google Sheet (รองรับฟิลด์ใหม่ของ Sprint 4)
+        เพิ่มหัวข้อบทความและคำสั่งรายละเอียดใหม่ลงใน Google Sheet (รองรับฟิลด์ใหม่ของ Sprint 5)
         """
         # อ่านข้อมูลคอลัมน์ A เพื่อคำนวณหา ID ถัดไป
         range_name = f"{self.sheet_name}!A:A"
@@ -312,7 +321,7 @@ class SheetsService:
                 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # เตรียมชุดข้อมูล 31 คอลัมน์ (A:AE)
+        # เตรียมชุดข้อมูล 35 คอลัมน์ (A:AI)
         row_data = [
             str(new_id),         # A: ID
             topic,               # B: Topic
@@ -322,16 +331,21 @@ class SheetsService:
             "", "", "", "", "", "", "", "", "", "", "", "", "", "", 
             now_str,             # S: Created At
             now_str,             # T: Updated At
-            # U to X (ฟิลด์ป้อนเข้าใหม่ของ Sprint 4)
+            # U to X (ฟิลด์ป้อนเข้าของ Sprint 4)
             target_audience,     # U: Target Audience
             business_type,       # V: Business Type
             content_goal,        # W: Content Goal
             tone,                # X: Tone
             # Y to AE (7 columns empty social outputs)
-            "", "", "", "", "", "", ""
+            "", "", "", "", "", "", "",
+            # AF to AI (ฟิลด์เพิ่มเติมของ Sprint 5)
+            content_type,        # AF: Content Type
+            blueprint_label,     # AG: Blueprint Label
+            blueprint_inputs_json, # AH: Blueprint Inputs JSON
+            output_types_list    # AI: Output Types List
         ]
         
-        write_range = f"{self.sheet_name}!A{new_row_idx}:AE{new_row_idx}"
+        write_range = f"{self.sheet_name}!A{new_row_idx}:AI{new_row_idx}"
         self.service.spreadsheets().values().update(
             spreadsheetId=self.spreadsheet_id,
             range=write_range,
@@ -345,9 +359,9 @@ class SheetsService:
     @retry(max_retries=3, delays=[2, 5, 10])
     def get_row_by_index(self, row_idx: int) -> SheetRow:
         """
-        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx) รองรับ 31 คอลัมน์
+        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx) รองรับ 35 คอลัมน์
         """
-        range_name = f"{self.sheet_name}!A{row_idx}:AE{row_idx}"
+        range_name = f"{self.sheet_name}!A{row_idx}:AI{row_idx}"
         result = self.service.spreadsheets().values().get(
             spreadsheetId=self.spreadsheet_id, range=range_name).execute()
         values = result.get('values', [])
@@ -355,7 +369,7 @@ class SheetsService:
         if not values:
             raise ValueError(f"ไม่พบข้อมูลในแถวที่ {row_idx}")
             
-        padded = values[0] + [''] * (31 - len(values[0]))
+        padded = values[0] + [''] * (35 - len(values[0]))
         return SheetRow(
             row_idx=row_idx,
             id=padded[0],
@@ -389,15 +403,20 @@ class SheetsService:
             tiktok_script=padded[27],
             youtube_shorts_script=padded[28],
             youtube_title=padded[29],
-            youtube_description=padded[30]
+            youtube_description=padded[30],
+            # ฟิลด์ใหม่ของ Sprint 5
+            content_type=padded[31] if padded[31] else "business",
+            blueprint_label=padded[32],
+            blueprint_inputs_json=padded[33] if padded[33] else "{}",
+            output_types_list=padded[34]
         )
 
     @retry(max_retries=3, delays=[2, 5, 10])
     def read_all_rows(self) -> List[SheetRow]:
         """
-        ดึงข้อมูลทุกแถวคิวประมวลผล (ช่วง A:AE) เพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
+        ดึงข้อมูลทุกแถวคิวประมวลผล (ช่วง A:AI) เพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
         """
-        range_name = f"{self.sheet_name}!A:AE"
+        range_name = f"{self.sheet_name}!A:AI"
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range=range_name).execute()
@@ -411,7 +430,7 @@ class SheetsService:
 
         all_rows = []
         for idx, row in enumerate(values[1:], start=2):
-            padded = row + [''] * (31 - len(row))
+            padded = row + [''] * (35 - len(row))
             sheet_row = SheetRow(
                 row_idx=idx,
                 id=padded[0],
@@ -445,7 +464,12 @@ class SheetsService:
                 tiktok_script=padded[27],
                 youtube_shorts_script=padded[28],
                 youtube_title=padded[29],
-                youtube_description=padded[30]
+                youtube_description=padded[30],
+                # ฟิลด์ใหม่ของ Sprint 5
+                content_type=padded[31] if padded[31] else "business",
+                blueprint_label=padded[32],
+                blueprint_inputs_json=padded[33] if padded[33] else "{}",
+                output_types_list=padded[34]
             )
             all_rows.append(sheet_row)
         return all_rows

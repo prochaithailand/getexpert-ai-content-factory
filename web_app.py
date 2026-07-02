@@ -2,10 +2,13 @@ import streamlit as st
 import time
 import os
 import logging
+import json
+import re
 from config.settings import Settings
 from services.sheets_service import SheetsService
 from services.gemini_service import GeminiService
 from services.blogger_service import BloggerService
+from services.blueprint_service import BlueprintService
 
 # กำหนดหน้าจอหลักของ Streamlit
 st.set_page_config(
@@ -15,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# สไตล์ CSS เพิ่มเติมเพื่อความพรีเมียม (ไม่มีส่วนห่อหุ้ม card html ที่แยกส่วนตัวเปิด/ปิดอีกต่อไป)
+# สไตล์ CSS เพิ่มเติมเพื่อความพรีเมียม
 st.markdown("""
 <style>
     .main {
@@ -50,6 +53,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ฟังก์ชันกำจัด HTML สำหรับจัดทำสำเนาบทความ (Plain Text)
+def strip_html_tags(html_text: str) -> str:
+    """
+    ล้างรหัส HTML tags ออกทั้งหมดเพื่อให้เหลือเฉพาะข้อความธรรมดา (Plain Text)
+    """
+    if not html_text:
+        return ""
+    # แทนที่แท็กขึ้นบรรทัดใหม่ด้วย \n
+    text = re.sub(r'</?(p|br|div|li|h1|h2|h3|h4|h5|h6)[^>]*>', '\n', html_text)
+    # ลบแท็กอื่นๆ ที่เหลือ
+    text = re.sub(r'<[^>]+>', '', text)
+    # จัดการการเว้นวรรคบรรทัดใหม่
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    return text.strip()
+
 # เริ่มต้นเรียกเซอร์วิส Sheets
 @st.cache_resource
 def get_sheets_service():
@@ -61,12 +79,15 @@ except Exception as e:
     st.error(f"ไม่สามารถเชื่อมต่อ Google Sheets API ได้: {e}")
     st.stop()
 
+# โหลดข้อมูล Blueprint ทั้งหมด
+blueprints_data = BlueprintService.get_all_blueprints()
+
 # ตรวจสอบ URL Parameter ว่าเป็น Demo Mode หรือไม่ (?demo=true)
 is_demo = st.query_params.get("demo", "false").lower() == "true"
 
 if is_demo:
     # ----------------------------------------------------
-    # DEMO MODE (Client Trial - คลีนและรันตอบสนองทันที - UX Sprint 1)
+    # DEMO MODE (Client Trial - คลีนและรันตอบสนองทันที - UX Sprint 1 / Sprint 5)
     # ----------------------------------------------------
     # Hero Section
     st.markdown("""
@@ -75,59 +96,124 @@ if is_demo:
             🚀 เปลี่ยน 1 หัวข้อ เป็นคอนเทนต์ครบทุกช่องทางด้วย AI
         </h1>
         <p style='font-size: 1.2em; color: #64748b; font-weight: 400; margin-bottom: 25px; max-width: 800px; margin-left: auto; margin-right: auto;'>
-            สร้างบทความ SEO, Facebook, TikTok, YouTube และ AI Image Prompt พร้อมใช้งานภายในไม่กี่นาที
+            สร้างแผนยุทธศาสตร์เนื้อหา บทความ SEO และโซเชียลสคริปต์ที่ตรงบริบทองค์กรของคุณทันที
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Value Cards (ใช้ตู้คอนเทนเนอร์แบบ Native)
+    # Value Cards
     with st.container(border=True):
         st.markdown("<h4 style='margin-bottom: 15px; color: #1e293b; font-weight: 700;'>🎁 คุณจะได้รับคอนเทนต์ทั้งหมดจากหัวข้อเดียว:</h4>", unsafe_allow_html=True)
         v_col1, v_col2, v_col3, v_col4, v_col5 = st.columns(5)
-        v_col1.markdown("📄 **SEO Article**")
-        v_col2.markdown("📘 **Facebook Post**")
-        v_col3.markdown("🎬 **TikTok Script**")
-        v_col4.markdown("▶️ **YouTube Shorts**")
+        v_col1.markdown("📄 **SEO / PR Article**")
+        v_col2.markdown("📘 **Social Media Post**")
+        v_col3.markdown("🎬 **TikTok Video Script**")
+        v_col4.markdown("▶️ **YouTube Shorts / Infographic**")
         v_col5.markdown("🖼️ **AI Image Prompt**")
-        st.markdown("<div style='margin-top: 10px; font-size: 0.8em; color: #94a3b8; font-weight: 500; text-align: right;'>ทั้งหมดสร้างจากหัวข้อเดียว</div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 10px; font-size: 0.8em; color: #94a3b8; font-weight: 500; text-align: right;'>ทั้งหมดสร้างด้วยการประมวลผลยุทธศาสตร์ AI Blueprint</div>", unsafe_allow_html=True)
 
     st.write("") # เว้นบรรทัดสั้นๆ
+    
+    # 1. Content Type Selector
+    st.write("##### 📈 เลือกประเภทงานที่ต้องการสร้างคอนเทนต์")
+    selected_content_type = st.radio(
+        "ประเภทคอนเทนต์ที่เหมาะสมกับเป้าหมายของคุณ:",
+        options=list(blueprints_data.keys()),
+        format_func=lambda k: f"{blueprints_data[k]['label']} — {blueprints_data[k]['description']}",
+        key="demo_content_selector"
+    )
+    
+    st.write("")
     col1, col2 = st.columns([1, 1.2])
 
     with col1:
-        # ฟอร์มรับข้อมูลห่อหุ้มใน Container(border=True)
         with st.container(border=True):
-            st.subheader("💡 บอก AI เกี่ยวกับธุรกิจของคุณ")
+            st.subheader("💡 ป้อนรายละเอียดตามบลูปริ้นต์")
             
             with st.form("demo_content_form", clear_on_submit=False):
-                topic = st.text_input(
-                    "หัวข้อที่ต้องการสร้างคอนเทนต์ *", 
-                    placeholder="น้ำมันสนเข็มแดงช่วยบรรเทาอาการปวดเมื่อยได้อย่างไร"
-                )
-                keyword = st.text_input(
-                    "คำค้นหาหลัก *", 
-                    placeholder="น้ำมันสนเข็มแดง"
-                )
+                blueprint_inputs = {}
                 
-                st.write("---")
-                st.markdown("**🎯 ข้อมูลแนวทางแบรนด์ (Brand Guidelines)**")
-                target_audience = st.text_input(
-                    "ลูกค้าของคุณคือใคร", 
-                    placeholder="คนวัยทำงานที่มีอาการปวดคอ บ่า ไหล่"
-                )
-                business_type = st.text_input(
-                    "ธุรกิจของคุณ", 
-                    placeholder="ธุรกิจผลิตภัณฑ์สุขภาพ"
-                )
-                content_goal = st.text_input(
-                    "คุณต้องการให้คอนเทนต์ช่วยอะไร", 
-                    placeholder="สร้างความน่าเชื่อถือและเพิ่มยอดขาย"
-                )
-                tone = st.text_input(
-                    "สไตล์การเขียน", 
-                    placeholder="เป็นกันเอง เข้าใจง่าย น่าเชื่อถือ"
-                )
-                
+                # แสดงฟอร์มตามลักษณะยุทธศาสตร์ประเภทที่เลือก (Dynamic Form)
+                if selected_content_type == "business":
+                    topic = st.text_input("หัวข้อที่ต้องการสร้างคอนเทนต์ *", placeholder="น้ำมันสนเข็มแดงช่วยบรรเทาอาการปวดเมื่อยได้อย่างไร")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="น้ำมันสนเข็มแดง")
+                    st.write("---")
+                    st.markdown("**🎯 ข้อมูลแนวทางแบรนด์ (Brand Guidelines)**")
+                    blueprint_inputs["business_name"] = st.text_input("ชื่อธุรกิจ / สินค้าของคุณคืออะไร", placeholder="เช่น GetExpert คลินิกสุขภาพ")
+                    blueprint_inputs["target_audience"] = st.text_input("ลูกค้ากลุ่มเป้าหมายคือใคร", placeholder="เช่น คนวัยทำงานที่มีอาการปวดเมื่อยคอบ่าไหล่")
+                    blueprint_inputs["customer_problem"] = st.text_input("ปัญหาหลักของลูกค้าคืออะไร", placeholder="เช่น ปวดเมื่อยเรื้อรังจากออฟฟิศซินโดรม")
+                    blueprint_inputs["unique_value"] = st.text_input("จุดเด่นของสินค้า / บริการ", placeholder="เช่น สกัดจากสมุนไพรธรรมชาติซึมไวไม่เหนียวเหนอะหนะ")
+                    blueprint_inputs["marketing_goal"] = st.text_input("เป้าหมายการตลาด", placeholder="เช่น สร้างความเชื่อมั่นและเพิ่มยอดขาย")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เป็นกันเอง เข้าใจง่าย น่าเชื่อถือ")
+                    blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น สั่งซื้อวันนี้รับส่วนลด 20%")
+                    
+                elif selected_content_type == "government":
+                    topic = st.text_input("หัวข้อประชาสัมพันธ์ *", placeholder="โครงการจัดการขยะอิเล็กทรอนิกส์ในชุมชน")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="ขยะอิเล็กทรอนิกส์, จัดการขยะ")
+                    st.write("---")
+                    st.markdown("**🏛 ข้อมูลประชาสัมพันธ์ภาครัฐ (Government Context)**")
+                    blueprint_inputs["agency_name"] = st.text_input("ชื่อหน่วยงานราชการของคุณ", placeholder="เช่น เทศบาลตำบลแสนสุข")
+                    blueprint_inputs["public_target"] = st.text_input("ประชาชนกลุ่มเป้าหมาย", placeholder="เช่น ผู้อยู่อาศัยในเขตเทศบาลแสนสุข")
+                    blueprint_inputs["project_objective"] = st.text_input("วัตถุประสงค์ของโครงการ", placeholder="เช่น รณรงค์แยกทิ้งขยะอันตรายอย่างถูกวิธี")
+                    blueprint_inputs["public_benefit"] = st.text_input("ประโยชน์ที่ประชาชนจะได้รับ", placeholder="เช่น ชุมชนสะอาด ปลอดภัยจากสารพิษตกค้าง")
+                    blueprint_inputs["key_information"] = st.text_input("ข้อมูลสำคัญที่ต้องการแจ้ง", placeholder="เช่น จุดบริการรับทิ้งขยะทุกวันเสาร์ที่ลานหน้าอำเภอ")
+                    blueprint_inputs["contact_channel"] = st.text_input("ช่องทางติดต่อ / เข้าร่วม", placeholder="เช่น โทรสายด่วนเทศบาล 1133 หรือเพจเทศบาล")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สุภาพ เป็นทางการ น่าเชื่อถือ เข้าใจง่าย")
+                    
+                elif selected_content_type == "csr":
+                    topic = st.text_input("ชื่อโครงการ / แคมเปญ *", placeholder="แคมเปญบริจาคหนังสือเก่าเพื่อน้องในชนบท")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="บริจาคหนังสือ, ปันความรู้")
+                    st.write("---")
+                    st.markdown("**❤️ ข้อมูลโครงการเพื่อสังคม (CSR Impact Context)**")
+                    blueprint_inputs["campaign_name"] = st.text_input("ชื่อแคมเปญเพื่อสังคม", placeholder="เช่น โครงการห้องสมุดปันฝัน")
+                    blueprint_inputs["social_problem"] = st.text_input("ปัญหาสังคมที่ต้องการแก้", placeholder="เช่น โรงเรียนชายขอบขาดแคลนหนังสือเสริมทักษะ")
+                    blueprint_inputs["affected_group"] = st.text_input("กลุ่มเป้าหมายที่ได้รับผลกระทบ", placeholder="เช่น นักเรียนโรงเรียนบ้านดอยสามสิบ")
+                    blueprint_inputs["campaign_goal"] = st.text_input("เป้าหมายของโครงการ", placeholder="เช่น รวบรวมหนังสืออ่านนอกเวลาจำนวน 500 เล่ม")
+                    blueprint_inputs["expected_impact"] = st.text_input("ผลลัพธ์ที่คาดหวัง", placeholder="เช่น ช่วยพัฒนาทักษะการอ่านและส่งเสริมโอกาสเด็กไทย")
+                    blueprint_inputs["participation_invite"] = st.text_input("สิ่งที่อยากเชิญชวนให้คนมีส่วนร่วม", placeholder="เช่น เชิญชวนบริจาคหนังสือสภาพดีที่จุดรับบริจาค")
+                    blueprint_inputs["organization_name"] = st.text_input("หน่วยงาน / องค์กรเจ้าของโครงการ", placeholder="เช่น บริษัท กรีนคอร์ป ร่วมกับ มูลนิธิปัญญา")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สร้างแรงบันดาลใจ อบอุ่น มีความหวัง เชิญชวน")
+                    
+                elif selected_content_type == "education":
+                    topic = st.text_input("หัวข้อบทเรียน / กิจกรรม *", placeholder="พื้นฐานการประหยัดพลังงานไฟฟ้าง่ายๆ ในชีวิตประจำวัน")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="ประหยัดไฟฟ้า, พลังงานในบ้าน")
+                    st.write("---")
+                    st.markdown("**🎓 ข้อมูลด้านการศึกษา (Educational Context)**")
+                    blueprint_inputs["institution_name"] = st.text_input("ชื่อสถาบันการศึกษา / มหาวิทยาลัย", placeholder="เช่น โรงเรียนวิทยารักษ์ หรือคอร์สออนไลน์ GetAcademy")
+                    blueprint_inputs["learner_group"] = st.text_input("ระดับชั้น / กลุ่มผู้เรียน", placeholder="เช่น นักเรียนมัธยมศึกษาตอนต้น หรือผู้เรียนทั่วไป")
+                    blueprint_inputs["learning_objective"] = st.text_input("วัตถุประสงค์การเรียนรู้", placeholder="เช่น เพื่อเข้าใจการเลือกใช้เครื่องใช้ไฟฟ้าอย่างประหยัดและถูกวิธี")
+                    blueprint_inputs["core_knowledge"] = st.text_input("สาระสำคัญที่ต้องการสื่อ", placeholder="เช่น การปิดไฟดวงที่ไม่ใช้, เลือกใช้แอร์เบอร์ 5, คำนวณค่าไฟคร่าวๆ")
+                    blueprint_inputs["expected_outcome"] = st.text_input("ผลลัพธ์ที่คาดหวังจากผู้เรียน", placeholder="เช่น ปรับเปลี่ยนพฤติกรรมเพื่อช่วยลดรายจ่ายในครอบครัว")
+                    blueprint_inputs["content_format"] = st.text_input("รูปแบบเนื้อหาที่ต้องการ", placeholder="เช่น บทเรียนสรุปสั้น 3 ประเด็นสำคัญพร้อมข้อดี")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เข้าใจง่าย มีเหตุผลเชิงวิทยาศาสตร์ สนุกสนานและสร้างสรรค์")
+                    
+                elif selected_content_type == "event":
+                    topic = st.text_input("ชื่องาน / กิจกรรม *", placeholder="งานสัมมนาติดอาวุธการเขียนบทความยอดขายล้านวิว")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="สัมมนาการเขียน, Content Marketing")
+                    st.write("---")
+                    st.markdown("**🎉 ข้อมูลการประชาสัมพันธ์กิจกรรม (Event Context)**")
+                    blueprint_inputs["event_name"] = st.text_input("ชื่อกิจกรรมประชาสัมพันธ์", placeholder="เช่น สัมมนา Write to Millionaire")
+                    blueprint_inputs["organizer_name"] = st.text_input("หน่วยงานหรือผู้จัด", placeholder="เช่น GetExpert AI Content Platform")
+                    blueprint_inputs["event_objective"] = st.text_input("วัตถุประสงค์ของงาน", placeholder="เช่น เพื่อเผยแพร่เทคนิคการทำ Content Marketing ยอดคนดูเยอะ")
+                    blueprint_inputs["date_time_location"] = st.text_input("วัน เวลา สถานที่จัดงาน", placeholder="เช่น วันที่ 25 กรกฎาคม 2570 เวลา 13:00 - 17:00 น. ณ ฮอลล์ 5 ไบเทคบางนา")
+                    blueprint_inputs["event_highlights"] = st.text_input("จุดเด่นของงาน", placeholder="เช่น แขกรับเชิญพิเศษจากครีเอเตอร์ชื่อดัง และแจกคอร์สสรุปฟรี")
+                    blueprint_inputs["attendee_benefits"] = st.text_input("สิ่งที่ผู้เข้าร่วมจะได้รับ", placeholder="เช่น ไฟล์เทมเพลตโพสต์เขียน 10 แบบฟรี และเครือข่ายผู้เข้าร่วมงาน")
+                    blueprint_inputs["registration_channel"] = st.text_input("ช่องทางลงทะเบียน / ติดต่อ", placeholder="เช่น แอดไลน์ @getexpert หรือจองตั๋วผ่าน getexpert.co/tickets")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น กระตุ้นความสนใจ น่าตื่นเต้น เชื้อเชิญ กระชับชัดเจน")
+                    
+                elif selected_content_type == "personal_brand":
+                    topic = st.text_input("หัวข้อที่ต้องการสื่อสาร *", placeholder="บทเรียนที่สำคัญที่สุดที่ผมเรียนรู้หลังจากเจ๊งธุรกิจรอบแรก")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="บทเรียนการทำธุรกิจ, ถอดบทเรียนความล้มเหลว")
+                    st.write("---")
+                    st.markdown("**👤 ข้อมูลแบรนด์บุคคล (Personal Branding)**")
+                    blueprint_inputs["expert_niche"] = st.text_input("ความเชี่ยวชาญ / กลุ่มวิชาชีพของคุณ", placeholder="เช่น ที่ปรึกษาผู้บริหารและนักวางกลยุทธ์ธุรกิจ")
+                    blueprint_inputs["target_followers"] = st.text_input("ผู้ติดตามหรือกลุ่มเป้าหมายคือใคร", placeholder="เช่น เจ้าของธุรกิจรุ่นใหม่และพนักงานฝันอยากมีธุรกิจ")
+                    blueprint_inputs["experience_story"] = st.text_input("ประสบการณ์หรือมุมมองสำคัญที่เล่า", placeholder="เช่น ประสบการณ์จัดงบการเงินพังจนต้องปิดร้านกาแฟร้านแรกในชีวิต")
+                    blueprint_inputs["core_identity"] = st.text_input("ภาพลักษณ์ที่ต้องการสร้าง", placeholder="เช่น ผู้เชี่ยวชาญตัวจริง ตรงไปตรงมา มีความจริงใจพร้อมแบ่งปัน")
+                    blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น กระแสเงินสดสำคัญกว่ากำไรทางบัญชีเสมอ")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องแบบภาพยนตร์ จริงใจ เป็นธรรมชาติ ถ่อมตัวแต่มีความรู้")
+                    blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น กดแชร์แบ่งปันบทเรียนนี้ หรือลงทะเบียนรับข่าวสารรายสัปดาห์")
+
                 submitted = st.form_submit_button("✨ สร้าง Content Pack")
                 
                 if submitted:
@@ -135,23 +221,37 @@ if is_demo:
                         st.error("กรุณากรอกทั้งหัวข้อและคีย์เวิร์ด (ช่องที่มีเครื่องหมาย *)")
                     else:
                         try:
-                            # รันประมวลผลแบบ Synchronous พร้อม st.status ลิสต์ทีละขั้นตอน (Loading Experience)
-                            with st.status("🧠 วิเคราะห์หัวข้อ...", expanded=True) as status_box:
+                            # รันประมวลผลแบบ Synchronous พร้อม st.status ลิสต์ทีละขั้นตอน
+                            with st.status("🧠 วิเคราะห์ยุทธศาสตร์และหัวข้อ...", expanded=True) as status_box:
                                 
-                                # 1. เขียนจองคิวลงชีต
-                                status_box.update(label="📚 วิเคราะห์คีย์เวิร์ด...")
+                                # 1. เตรียมข้อมูล Blueprint สำหรับ Google Sheets
+                                status_box.update(label="📚 บันทึกแผนงานและวิเคราะห์คีย์เวิร์ด...")
+                                blueprint_label = blueprints_data[selected_content_type]["label"]
+                                blueprint_inputs_json = json.dumps(blueprint_inputs, ensure_ascii=False)
+                                output_types_list = ", ".join(blueprints_data[selected_content_type]["outputs"].keys())
+                                
+                                # แมปข้อมูลสำหรับคอลัมน์ U:X เดิมเพื่อความเข้ากันได้ย้อนหลัง
+                                target_audience = blueprint_inputs.get("target_audience", blueprint_inputs.get("public_target", blueprint_inputs.get("target_followers", "")))
+                                business_type = blueprint_inputs.get("business_name", blueprint_inputs.get("agency_name", blueprint_inputs.get("organization_name", blueprint_inputs.get("institution_name", ""))))
+                                content_goal = blueprint_inputs.get("marketing_goal", blueprint_inputs.get("project_objective", blueprint_inputs.get("campaign_goal", blueprint_inputs.get("learning_objective", ""))))
+                                tone = blueprint_inputs.get("tone", "")
+                                
                                 row_idx = sheets_service.add_new_row(
                                     topic=topic,
                                     keyword=keyword,
                                     target_audience=target_audience,
                                     business_type=business_type,
                                     content_goal=content_goal,
-                                    tone=tone
+                                    tone=tone,
+                                    content_type=selected_content_type,
+                                    blueprint_label=blueprint_label,
+                                    blueprint_inputs_json=blueprint_inputs_json,
+                                    output_types_list=output_types_list
                                 )
                                 sheets_service.update_row_status(row_idx, "Processing")
                                 
                                 # 2. เรียกใช้งาน Gemini API
-                                status_box.update(label="✍️ สร้างบทความ SEO...")
+                                status_box.update(label="✍️ สร้างบทความคุณภาพสูง...")
                                 gemini_service = GeminiService()
                                 seo_content = gemini_service.generate_blogger_article(
                                     topic=topic,
@@ -159,23 +259,15 @@ if is_demo:
                                     target_audience=target_audience,
                                     business_type=business_type,
                                     content_goal=content_goal,
-                                    tone=tone
+                                    tone=tone,
+                                    content_type=selected_content_type,
+                                    blueprint_inputs=blueprint_inputs
                                 )
                                 
                                 # 3. อัปโหลดขึ้น Blogger Draft
-                                status_box.update(label="📘 สร้าง Facebook...")
-                                # (ประมวลผลเสร็จแล้วในออบเจ็กต์โครงสร้าง JSON)
+                                status_box.update(label="📘 จัดเตรียมโซเชียลมีเดียสลับเนื้อหา...")
                                 
-                                status_box.update(label="🎬 สร้าง TikTok...")
-                                # (สคริปต์บรรจุเรียบร้อย)
-                                
-                                status_box.update(label="▶️ สร้าง YouTube Shorts...")
-                                # (สคริปต์ Shorts บรรจุเรียบร้อย)
-                                
-                                status_box.update(label="🖼️ สร้าง AI Image Prompt...")
-                                # (คำแนะแนววาดภาพบรรจุเรียบร้อย)
-                                
-                                status_box.update(label="🔗 อัปโหลดแบบร่าง Blogger...")
+                                status_box.update(label="🔗 อัปโหลดแบบร่างหลังบ้าน...")
                                 blogger_service = BloggerService()
                                 
                                 faq_html = ""
@@ -225,80 +317,95 @@ if is_demo:
                                 "featured_image_prompt": seo_content.featured_image.prompt,
                                 "image_style": seo_content.featured_image.style,
                                 "image_concept": seo_content.featured_image.concept,
-                                "article_html": full_html
+                                "article_html": full_html,
+                                # ข้อมูล Sprint 5
+                                "content_type": selected_content_type,
+                                "blueprint_label": blueprint_label,
+                                "outputs_map": blueprints_data[selected_content_type]["outputs"]
                             }
                         except Exception as err:
                             st.error(f"เกิดข้อผิดพลาดในการประมวลผลสัญญาน: {err}")
 
     with col2:
-        # ส่วนแสดงผลลัพธ์ห่อหุ้มใน Container(border=True)
         with st.container(border=True):
             if 'demo_result' in st.session_state:
                 res = st.session_state['demo_result']
                 
                 # Success Banner
                 st.success("🎉 Content Pack พร้อมใช้งานแล้ว")
+                st.info(f"📋 ประเภทคอนเทนต์: **{res.get('blueprint_label', 'ธุรกิจ')}**")
                 
-                tab_blogger, tab_facebook, tab_tiktok, tab_youtube, tab_image = st.tabs([
-                    "📰 Blogger & SEO", 
-                    "📘 Facebook Post", 
-                    "🎵 TikTok Script", 
-                    "🔴 YouTube Shorts",
-                    "🎨 Image Prompts"
-                ])
+                # ดึงโครงสร้าง Tab Labels ไดนามิกเฉพาะของแต่ละ Blueprint
+                outputs_map = res.get("outputs_map", {})
+                tab_labels = [
+                    outputs_map.get("seo_article", "📰 Blogger & SEO"),
+                    outputs_map.get("facebook_post", "📘 Facebook Post"),
+                    outputs_map.get("tiktok_script", "🎵 TikTok Script"),
+                    outputs_map.get("youtube_script", "🔴 YouTube Shorts"),
+                    outputs_map.get("image_prompt", "🎨 Image Prompts")
+                ]
+                
+                tab_blogger, tab_facebook, tab_tiktok, tab_youtube, tab_image = st.tabs(tab_labels)
                 
                 with tab_blogger:
-                    st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คัดลอกซอร์สโค้ด HTML ด้านล่างสุด หรือเปิดร่างใน Blogger)")
-                    st.markdown(f"🔗 **Blogger Link:** [คลิกเปิดอ่านร่างบทความบนเว็บ Blogger]({res['blogger_url']})")
+                    st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy มุมขวาบนของกล่องข้อความดิบ หรือก๊อปปี้ HTML ด้านล่างสุด)")
+                    st.markdown(f"##### 📋 คัดลอก{outputs_map.get('seo_article', 'บทความทั้งหมด')} (ข้อความธรรมดา)")
+                    clean_text = strip_html_tags(res['article_html'])
+                    full_copyable_text = f"หัวข้อ (Title): {res['seo_title']}\nคำโปรย (Meta Description): {res['meta_description']}\n\n{clean_text}"
+                    st.code(full_copyable_text, language=None)
+                    
+                    st.write("---")
                     st.write(f"**SEO Title:** {res['seo_title']}")
                     st.write(f"**Meta Description:** {res['meta_description']}")
                     st.write(f"**Slug (URL แนะนำ):** `{res['slug_suggestion']}`")
                     st.write(f"**Focus Keyword:** {res['focus_keyword']}")
                     st.write(f"**Summary:** {res['content_summary']}")
+                    
                     st.write("---")
-                    st.write("**ตัวอย่างหน้าตาบทความ (Formatted Preview):**")
+                    st.markdown("##### 👀 ตัวอย่างหน้าตาบทความ (Formatted Preview)")
                     st.markdown(res['article_html'], unsafe_allow_html=True)
+                    
                     st.write("---")
-                    st.write("**ซอร์สโค้ด HTML (สำหรับก๊อปปี้ไปวางหลังบ้านเว็บอื่นๆ):**")
+                    st.markdown("##### 📋 คัดลอก HTML Source")
                     st.code(res['article_html'], language="html")
                     
                 with tab_facebook:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนของกล่องรหัส)")
-                    st.markdown("**ข้อความโพสต์แนะนำสำหรับ Facebook:**")
+                    st.markdown(f"**ข้อความโพสต์ประชาสัมพันธ์ ({outputs_map.get('facebook_post', 'Social Post')}):**")
                     st.code(res['facebook_post'], language=None)
                     st.write(f"**แฮชแท็กแนะนำ:** {res['facebook_hashtags']}")
                     
                 with tab_tiktok:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนของกล่องรหัสเพื่อคัดลอกสคริปต์)")
                     st.markdown(f"🔥 **TikTok Hook ดึงดูดสายตา:** *\"{res['tiktok_hook']}\"*")
-                    st.markdown("**สคริปต์สั้นบทพูดและแนวภาพ TikTok:**")
+                    st.markdown(f"**{outputs_map.get('tiktok_script', 'สคริปต์สั้นบทพูดและแนวภาพ TikTok')}:**")
                     st.code(res['tiktok_script'], language=None)
                     
                 with tab_youtube:
-                    st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนเพื่อคัดลอกสคริปต์ Shorts)")
-                    st.write(f"🎥 **YouTube Shorts Title:** {res['youtube_title']}")
-                    st.write(f"**YouTube Description:** {res['youtube_description']}")
-                    st.markdown("**สคริปต์สำหรับวิดีโอ YouTube Shorts:**")
+                    st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy ที่มุมขวาบนเพื่อคัดลอกสคริปต์)")
+                    st.write(f"🎥 **{outputs_map.get('youtube_script', 'YouTube Shorts Title')}:** {res['youtube_title']}")
+                    st.write(f"**คำอธิบายและสรุป:** {res['youtube_description']}")
+                    st.markdown(f"**{outputs_map.get('youtube_script', 'สคริปต์สำหรับวิดีโอ YouTube Shorts')}:**")
                     st.code(res['youtube_shorts_script'], language=None)
                     
                 with tab_image:
                     st.info("📋 คัดลอกเพื่อนำไปใช้งานได้ทันที (คลิกปุ่ม Copy มุมขวาเพื่อนำคำสั่งไปส่ง AI วาดภาพ)")
-                    st.markdown("**Featured Image Prompt:**")
+                    st.markdown(f"**{outputs_map.get('image_prompt', 'Featured Image Prompt')}:**")
                     st.code(res['featured_image_prompt'], language=None)
                     st.write(f"**Image Style:** {res['image_style']}")
                     st.write(f"**Concept:** {res['image_concept']}")
             else:
-                # Empty State (ก่อนลูกค้ากดเจนเนื้อหา - ใช้กล่องข้อความ HTML ปิดสมบูรณ์ในตัวเดียว)
+                # Empty State (ก่อนลูกค้ากดเจนเนื้อหา)
                 st.markdown("""
                 <div style='text-align: center; padding: 40px 20px;'>
                     <div style='font-size: 55px; margin-bottom: 20px;'>📦</div>
                     <h3 style='margin-bottom: 15px; color: #1e293b; font-weight: 700; font-size: 1.3em;'>Content Pack ของคุณจะประกอบด้วย</h3>
                     <div style='text-align: left; max-width: 280px; margin: 0 auto 25px auto; color: #475569; font-size: 0.95em; line-height: 1.8; font-weight: 500;'>
-                        • 📄 บทความ SEO พร้อมใช้งาน<br/>
-                        • 📘 โพสต์ Facebook ดึงดูดความสนใจ<br/>
-                        • 🎬 สคริปต์วิดีโอสั้นลง TikTok<br/>
-                        • ▶️ สคริปต์วิดีโอ YouTube Shorts<br/>
-                        • 🖼️ Prompt วาดรูปภาพปกด้วย AI
+                        • 📄 บทความคุณภาพสูง หรือข่าวประชาสัมพันธ์<br/>
+                        • 📘 โพสต์สื่อโซเชียลมีเดียหลักสไตล์แบรนด์<br/>
+                        • 🎬 สคริปต์สั้นสำหรับวิดีโอ TikTok<br/>
+                        • ▶️ รายละเอียดคำบรรยาย / สคริปต์วิดีโอสั้น YouTube<br/>
+                        • 🖼️ Prompt วาดรูปภาพประกอบประชาสัมพันธ์
                     </div>
                     <p style='font-weight: 700; color: #007bff; font-size: 1em; margin-top: 15px;'>เมื่อพร้อมแล้ว กรอกข้อมูลด้านซ้ายแล้วกดปุ่ม "✨ สร้าง Content Pack"</p>
                 </div>
@@ -309,25 +416,107 @@ else:
     # STANDARD MODE (Admin Portal - เมนูจัดการหลังบ้านเดิม)
     # ----------------------------------------------------
     st.title("🚀 GetExpert AI Content Factory Portal")
-    st.markdown("ระบบผลิตชุดโซเชียลคอนเทนต์ครบวงจร (Sprint 4: Client Delivery & Content Pack MVP)")
+    st.markdown("ระบบผลิตชุดโซเชียลคอนเทนต์ครบวงจร (Sprint 5: Client Delivery & AI Content Blueprint Strategy)")
+
+    # 1. Content Type Selector
+    st.write("##### 📈 เลือกประเภทงานที่ต้องการสร้างคอนเทนต์")
+    selected_content_type = st.radio(
+        "ประเภทคอนเทนต์ที่เหมาะสมกับเป้าหมายของคุณ:",
+        options=list(blueprints_data.keys()),
+        format_func=lambda k: f"{blueprints_data[k]['label']} — {blueprints_data[k]['description']}",
+        key="std_content_selector"
+    )
 
     col1, col2 = st.columns([1, 1.2])
 
     with col1:
         with st.container(border=True):
-            st.subheader("📝 ป้อนคำขอเขียนบทความและระบุแนวทางแบรนด์")
+            st.subheader("📝 ป้อนรายละเอียดตามบลูปริ้นต์")
             
             with st.form("content_form", clear_on_submit=True):
-                topic = st.text_input("หัวข้อบทความ (Topic) *", placeholder="เช่น วิธีประหยัดค่าไฟช่วงหน้าร้อน")
-                keyword = st.text_input("คำสำคัญหลัก (Focus Keyword) *", placeholder="เช่น ประหยัดค่าไฟ, แอร์บ้าน")
+                blueprint_inputs = {}
                 
-                st.write("---")
-                st.markdown("**🎯 ข้อมูลบริบทแบรนด์ (Brand Contexts)**")
-                target_audience = st.text_input("กลุ่มเป้าหมาย (Target Audience)", placeholder="เช่น เจ้าของธุรกิจขนาดเล็ก, พนักงานบริษัท")
-                business_type = st.text_input("ประเภทธุรกิจ (Business Type)", placeholder="เช่น ร้านอาหาร, คลินิกความงาม")
-                content_goal = st.text_input("เป้าหมายเนื้อหา (Content Goal)", placeholder="เช่น ดึงผู้ซื้อรายใหม่, เพิ่มยอดแอดไลน์")
-                tone = st.text_input("โทนน้ำเสียงที่ต้องการ (Tone)", placeholder="เช่น สุภาพเป็นทางการ, สนุกสนานเป็นกันเอง")
-                
+                # แสดงฟอร์มตามลักษณะยุทธศาสตร์ประเภทที่เลือก (Dynamic Form)
+                if selected_content_type == "business":
+                    topic = st.text_input("หัวข้อที่ต้องการสร้างคอนเทนต์ *", placeholder="วิธีประหยัดค่าไฟช่วงหน้าร้อน")
+                    keyword = st.text_input("คำสำคัญหลัก (Focus Keyword) *", placeholder="ประหยัดค่าไฟ, แอร์บ้าน")
+                    st.write("---")
+                    st.markdown("**🎯 ข้อมูลแนวทางแบรนด์ (Brand Guidelines)**")
+                    blueprint_inputs["business_name"] = st.text_input("ชื่อธุรกิจ / สินค้าของคุณคืออะไร", placeholder="เช่น ร้านจำหน่ายเครื่องปรับอากาศ")
+                    blueprint_inputs["target_audience"] = st.text_input("ลูกค้ากลุ่มเป้าหมายคือใคร", placeholder="เช่น เจ้าของบ้านทั่วไป, แม่บ้านพ่อบ้าน")
+                    blueprint_inputs["customer_problem"] = st.text_input("ปัญหาหลักของลูกค้าคืออะไร", placeholder="เช่น ค่าไฟฟ้าพุ่งสูงช่วงฤดูร้อน")
+                    blueprint_inputs["unique_value"] = st.text_input("จุดเด่นของสินค้า / บริการ", placeholder="เช่น บริการล้างแอร์แถมแผงกันความร้อนฟรี")
+                    blueprint_inputs["marketing_goal"] = st.text_input("เป้าหมายการตลาด", placeholder="เช่น เพิ่มยอดจองคิวบริการล้างแอร์ช่วงนี้")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สุภาพเป็นทางการ, สนุกสนานเป็นกันเอง")
+                    blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น จองคิวล้างแอร์ด่วนวันนี้ลดทันที 15%")
+                    
+                elif selected_content_type == "government":
+                    topic = st.text_input("หัวข้อประชาสัมพันธ์ *", placeholder="โครงการตรวจสุขภาพฟรีกองทุนสุขภาพประจำปี")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="ตรวจสุขภาพฟรี, กองทุนสุขภาพ")
+                    st.write("---")
+                    st.markdown("**🏛 ข้อมูลประชาสัมพันธ์ภาครัฐ (Government Context)**")
+                    blueprint_inputs["agency_name"] = st.text_input("ชื่อหน่วยงานราชการของคุณ", placeholder="เช่น อบต. บางรัก")
+                    blueprint_inputs["public_target"] = st.text_input("ประชาชนกลุ่มเป้าหมาย", placeholder="เช่น ประชาชนสิทธิหลักประกันสุขภาพในเขต อบต.")
+                    blueprint_inputs["project_objective"] = st.text_input("วัตถุประสงค์ของโครงการ", placeholder="เช่น เพื่อการป้องกันโรคและส่งเสริมสุขภาพล่วงหน้า")
+                    blueprint_inputs["public_benefit"] = st.text_input("ประโยชน์ที่ประชาชนจะได้รับ", placeholder="เช่น ตรวจสุขภาพเบื้องต้น 10 รายการ ฟรีไม่เสียค่าใช้จ่าย")
+                    blueprint_inputs["key_information"] = st.text_input("ข้อมูลสำคัญที่ต้องการแจ้ง", placeholder="เช่น ติดต่อรับบัตรคิวได้ที่ รพ.สต. ใกล้บ้าน หรือ ณ หอประชุมอำเภอ")
+                    blueprint_inputs["contact_channel"] = st.text_input("ช่องทางติดต่อ / เข้าร่วม", placeholder="เช่น โทร 02-123-4567 ต่อกองการสาธารณสุข")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สุภาพ เรียบร้อย น่าเชื่อถือ เข้าใจง่าย")
+                    
+                elif selected_content_type == "csr":
+                    topic = st.text_input("ชื่อโครงการ / แคมเปญ *", placeholder="โครงการปลูกป่าชายเลนคืนความอุดมสมบูรณ์")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="ปลูกป่าชายเลน, รักษ์โลก")
+                    st.write("---")
+                    st.markdown("**❤️ ข้อมูลโครงการเพื่อสังคม (CSR Impact Context)**")
+                    blueprint_inputs["campaign_name"] = st.text_input("ชื่อแคมเปญเพื่อสังคม", placeholder="เช่น โครงการป่าเลนฟื้นใจ")
+                    blueprint_inputs["social_problem"] = st.text_input("ปัญหาสังคมที่ต้องการแก้", placeholder="เช่น แนวชายฝั่งถูกกัดเซาะและแหล่งพันธุ์สัตว์น้ำลดลง")
+                    blueprint_inputs["affected_group"] = st.text_input("กลุ่มเป้าหมายที่ได้รับผลกระทบ", placeholder="เช่น ชุมชนชาวประมงพื้นบ้านบริเวณชายฝั่ง")
+                    blueprint_inputs["campaign_goal"] = st.text_input("เป้าหมายของโครงการ", placeholder="เช่น ปลูกกล้าโกงกางจำนวน 2,000 ต้น")
+                    blueprint_inputs["expected_impact"] = st.text_input("ผลลัพธ์ที่คาดหวัง", placeholder="เช่น ชุมชนมีแนวป้องกันภัยธรรมชาติและสัตว์น้ำกลับมาสมบูรณ์")
+                    blueprint_inputs["participation_invite"] = st.text_input("สิ่งที่อยากเชิญชวนให้คนมีส่วนร่วม", placeholder="เช่น เชิญชวนอาสาสมัครร่วมลงพื้นที่ปลูกป่าวันเสาร์")
+                    blueprint_inputs["organization_name"] = st.text_input("หน่วยงาน / องค์กรเจ้าของโครงการ", placeholder="เช่น บริษัท พลังงานสะอาด จำกัด มหาชน")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สื่อสารเห็นอกเห็นใจ ชักชวนร่วมมือ มุ่งมั่นพัฒนาสังคม")
+                    
+                elif selected_content_type == "education":
+                    topic = st.text_input("หัวข้อบทเรียน / กิจกรรม *", placeholder="วิธีการทำงานและประโยชน์เบื้องต้นของ AI ในชีวิตการทำงาน")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="เรียนรู้ AI, ประโยชน์ของปัญญาประดิษฐ์")
+                    st.write("---")
+                    st.markdown("**🎓 ข้อมูลด้านการศึกษา (Educational Context)**")
+                    blueprint_inputs["institution_name"] = st.text_input("ชื่อสถาบันการศึกษา / มหาวิทยาลัย", placeholder="เช่น มหาวิทยาลัยเทคโนโลยีการเขียน")
+                    blueprint_inputs["learner_group"] = st.text_input("ระดับชั้น / กลุ่มผู้เรียน", placeholder="เช่น ผู้เริ่มต้นสนใจด้านเทคโนโลยี และวัยทำงาน")
+                    blueprint_inputs["learning_objective"] = st.text_input("วัตถุประสงค์การเรียนรู้", placeholder="เช่น เพื่อเข้าใจการใช้ Prompt ทุ่นแรงงานประจำวัน")
+                    blueprint_inputs["core_knowledge"] = st.text_input("สาระสำคัญที่ต้องการสื่อ", placeholder="เช่น นิยาม AI, การเขียนคำสั่งเบื้องต้น, ตัวอย่างเคสล้างตาราง")
+                    blueprint_inputs["expected_outcome"] = st.text_input("ผลลัพธ์ที่คาดหวังจากผู้เรียน", placeholder="เช่น ผู้เรียนสามารถเอาเครื่องมือ AI ไปประยุกต์ใช้ลดเวลาทำงาน")
+                    blueprint_inputs["content_format"] = st.text_input("รูปแบบเนื้อหาที่ต้องการ", placeholder="เช่น สรุปเนื้อหาบทความแบ่งเป็น 3 หมวดการเรียนรู้")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เข้าใจง่าย มีเหตุและผลวิชาการ ปรับใช้อบรมได้จริง")
+                    
+                elif selected_content_type == "event":
+                    topic = st.text_input("ชื่องาน / กิจกรรม *", placeholder="งานมหกรรมรวมพลังครีเอเตอร์และอินฟลูเอนเซอร์แห่งปี")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="มหกรรมครีเอเตอร์, Creator Expo")
+                    st.write("---")
+                    st.markdown("**🎉 ข้อมูลการประชาสัมพันธ์กิจกรรม (Event Context)**")
+                    blueprint_inputs["event_name"] = st.text_input("ชื่อกิจกรรมประชาสัมพันธ์", placeholder="เช่น งาน Creator Festival 2027")
+                    blueprint_inputs["organizer_name"] = st.text_input("หน่วยงานหรือผู้จัด", placeholder="เช่น ชมรมมีเดียสร้างสรรค์")
+                    blueprint_inputs["event_objective"] = st.text_input("วัตถุประสงค์ของงาน", placeholder="เช่น เพื่อรวมตัวครีเอเตอร์มาแบ่งปันแนวทางและพบปะแฟนคลับ")
+                    blueprint_inputs["date_time_location"] = st.text_input("วัน เวลา สถานที่จัดงาน", placeholder="เช่น วันที่ 18-19 กันยายน 2570 ณ รอยัลพารากอนฮอลล์ ชั้น 5")
+                    blueprint_inputs["event_highlights"] = st.text_input("จุดเด่นของงาน", placeholder="เช่น เวทีพูดคุยแลกเปลี่ยนประสบการณ์ และลานเปิดตัวช่องดัง")
+                    blueprint_inputs["attendee_benefits"] = st.text_input("สิ่งที่ผู้เข้าร่วมจะได้รับ", placeholder="เช่น การแลกเปลี่ยนคำแนะนำกับคีย์แบรนด์ สิทธิ์เข้าลุ้นรางวัล")
+                    blueprint_inputs["registration_channel"] = st.text_input("ช่องทางลงทะเบียน / ติดต่อ", placeholder="เช่น ลงทะเบียนผ่านแอป EventPop หรือเว็บไซต์งาน")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น มีความกระตือรือร้น ทันสมัย สุภาพและตื่นตาตื่นใจ")
+                    
+                elif selected_content_type == "personal_brand":
+                    topic = st.text_input("หัวข้อที่ต้องการสื่อสาร *", placeholder="เทคนิคการจัดการเวลาแบบ 80/20 ที่ผมใช้ทำงานแค่ 4 ชั่วโมงต่อวัน")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="เทคนิคจัดเวลา, กฎ 80/20")
+                    st.write("---")
+                    st.markdown("**👤 ข้อมูลแบรนด์บุคคล (Personal Branding)**")
+                    blueprint_inputs["expert_niche"] = st.text_input("ความเชี่ยวชาญ / กลุ่มวิชาชีพของคุณ", placeholder="เช่น โค้ชพัฒนาทักษะและความก้าวหน้าในอาชีพ")
+                    blueprint_inputs["target_followers"] = st.text_input("ผู้ติดตามหรือกลุ่มเป้าหมายคือใคร", placeholder="เช่น ฟรีแลนซ์และพนักงานออฟฟิศที่เผชิญภาวะงานทับตัว")
+                    blueprint_inputs["experience_story"] = st.text_input("ประสบการณ์หรือมุมมองสำคัญที่เล่า", placeholder="เช่น เคยล้มป่วยจากสัญญานทำงานหามรุ่งหามค่ำจนเปลี่ยนชีวิต")
+                    blueprint_inputs["core_identity"] = st.text_input("ภาพลักษณ์ที่ต้องการสร้าง", placeholder="เช่น ผู้ให้คำปรึกษาที่ให้ผลลัพธ์ที่เป็นความจริง สไตล์จริงใจตรงไปตรงมา")
+                    blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น การปัดปฏิเสธงานไม่สำคัญคือทักษะการเพิ่มผลิตภาพที่แท้จริง")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องผ่านตัวคุณ เป็นกันเองจริงใจ มีความสุภาพแต่น่าฟัง")
+                    blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น กดแชร์หากคุณคิดเหมือนกัน หรือทักเรามาใต้คอมเมนต์เพื่อแลกไอเดีย")
+
                 submitted = st.form_submit_button("ส่งคำขอเขียนและแพ็คคอนเทนต์ (Add to Queue)")
                 
                 if submitted:
@@ -335,14 +524,27 @@ else:
                         st.error("กรุณากรอกหัวข้อและคำสำคัญคีย์หลัก (มีเครื่องหมาย *)")
                     else:
                         try:
-                            # แทรกข้อมูลแถวใหม่พร้อมรายละเอียดบริบทลงชีต
+                            # บันทึกข้อมูลแผนงานบลูปริ้นต์ลงชีตในระบบคิวงานรอรันรายวัน
+                            blueprint_label = blueprints_data[selected_content_type]["label"]
+                            blueprint_inputs_json = json.dumps(blueprint_inputs, ensure_ascii=False)
+                            output_types_list = ", ".join(blueprints_data[selected_content_type]["outputs"].keys())
+                            
+                            target_audience = blueprint_inputs.get("target_audience", blueprint_inputs.get("public_target", blueprint_inputs.get("target_followers", "")))
+                            business_type = blueprint_inputs.get("business_name", blueprint_inputs.get("agency_name", blueprint_inputs.get("organization_name", blueprint_inputs.get("institution_name", ""))))
+                            content_goal = blueprint_inputs.get("marketing_goal", blueprint_inputs.get("project_objective", blueprint_inputs.get("campaign_goal", blueprint_inputs.get("learning_objective", ""))))
+                            tone = blueprint_inputs.get("tone", "")
+                            
                             row_idx = sheets_service.add_new_row(
                                 topic=topic,
                                 keyword=keyword,
                                 target_audience=target_audience,
                                 business_type=business_type,
                                 content_goal=content_goal,
-                                tone=tone
+                                tone=tone,
+                                content_type=selected_content_type,
+                                blueprint_label=blueprint_label,
+                                blueprint_inputs_json=blueprint_inputs_json,
+                                output_types_list=output_types_list
                             )
                             st.session_state['last_row_idx'] = row_idx
                             st.success(f"ส่งคำขอเข้าสู่คิวงานเรียบร้อยแล้ว! (พิกัดแถวที่ {row_idx})")
@@ -379,14 +581,22 @@ else:
                     if status_lower == "drafted":
                         st.success("🎉 ระบบผลิตชุด Content Pack สำเร็จเสร็จสมบูรณ์เรียบร้อยแล้ว!")
                         
-                        # แบ่งหมวดหมู่งานคัดลอกด้วย Tabs
-                        tab_blogger, tab_facebook, tab_tiktok, tab_youtube, tab_image = st.tabs([
-                            "📰 Blogger & SEO", 
-                            "📘 Facebook Post", 
-                            "🎵 TikTok Script", 
-                            "🔴 YouTube Shorts",
-                            "🎨 Image Prompts"
-                        ])
+                        # ค้นหาค่า Blueprint จาก row_data.content_type เพื่อคำนวณป้ายชื่อ Tab แบบไดนามิก
+                        row_content_type = getattr(row_data, 'content_type', 'business')
+                        row_blueprint = BlueprintService.get_blueprint(row_content_type)
+                        row_outputs = row_blueprint.get("outputs", {})
+                        
+                        st.info(f"📂 AI Content Blueprint ที่ใช้: **{row_blueprint.get('label', 'ธุรกิจ')}**\n\nบทบาท: *{row_blueprint.get('prompt_strategy', {}).get('role', '')}*")
+                        
+                        tab_labels = [
+                            row_outputs.get("seo_article", "📰 Blogger & SEO"),
+                            row_outputs.get("facebook_post", "📘 Facebook Post"),
+                            row_outputs.get("tiktok_script", "🎵 TikTok Script"),
+                            row_outputs.get("youtube_script", "🔴 YouTube Shorts"),
+                            row_outputs.get("image_prompt", "🎨 Image Prompts")
+                        ]
+                        
+                        tab_blogger, tab_facebook, tab_tiktok, tab_youtube, tab_image = st.tabs(tab_labels)
                         
                         with tab_blogger:
                             st.markdown(f"🔗 **Blogger Draft URL:** [คลิกเปิดร่างบทความใน Blogger]({row_data.blogger_url})")
@@ -399,23 +609,23 @@ else:
                             st.write(f"**Content Summary:** {row_data.content_summary}")
                             
                         with tab_facebook:
-                            st.markdown("**โพสต์แนะนำสำหรับ Facebook (สามารถคลิกมุมขวาบนเพื่อคัดลอกได้ทันที):**")
+                            st.markdown(f"**โพสต์แนะนำประชาสัมพันธ์ ({row_outputs.get('facebook_post', 'Social Post')}):**")
                             st.code(row_data.facebook_post, language=None)
                             st.write(f"**แนะนำแฮชแท็ก:** {row_data.facebook_hashtags}")
                             
                         with tab_tiktok:
                             st.markdown(f"🔥 **TikTok Hook (3 วินาทีแรก):** *\"{row_data.tiktok_hook}\"*")
-                            st.markdown("**สคริปต์สั้นบทพูดและแนวภาพ TikTok (Copy ไปใช้งานอัดคลิป):**")
+                            st.markdown(f"**{row_outputs.get('tiktok_script', 'สคริปต์สั้นบทพูดและแนวภาพ TikTok')}:**")
                             st.code(row_data.tiktok_script, language=None)
                             
                         with tab_youtube:
-                            st.write(f"🎥 **YouTube Shorts Title:** {row_data.youtube_title}")
-                            st.write(f"**YouTube Description:** {row_data.youtube_description}")
-                            st.markdown("**สคริปต์วิดีโอ YouTube Shorts:**")
+                            st.write(f"🎥 **{row_outputs.get('youtube_script', 'YouTube Shorts Title')}:** {row_data.youtube_title}")
+                            st.write(f"**คำอธิบายสรุปข่าว:** {row_data.youtube_description}")
+                            st.markdown(f"**{row_outputs.get('youtube_script', 'สคริปต์วิดีโอ YouTube Shorts')}:**")
                             st.code(row_data.youtube_shorts_script, language=None)
                             
                         with tab_image:
-                            st.markdown("**Featured Image Prompt (Midjourney / DALL-E):**")
+                            st.markdown(f"**{row_outputs.get('image_prompt', 'Featured Image Prompt')}:**")
                             st.code(row_data.featured_image_prompt, language=None)
                             st.write(f"**Image Style:** {row_data.image_style}")
                             st.write(f"**Image Concept:** {row_data.image_concept}")
@@ -447,14 +657,18 @@ else:
             # แปลงข้อมูลวัตถุ Pydantic เข้าสู่รูปแบบตารางเพื่อแสดงผลใน Streamlit
             table_data = []
             for row in reversed(all_rows): # กลับลำดับเพื่อให้แถวใหม่สุดอยู่บนสุด
+                # ค้นหาป้ายประเภทบลูปริ้นต์
+                row_type = getattr(row, 'content_type', 'business')
+                bp_info = blueprints_data.get(row_type, blueprints_data["business"])
+                
                 table_data.append({
                     "ID": row.id,
+                    "ประเภทคอนเทนต์": bp_info["label"],
                     "Topic": row.topic,
                     "Keyword": row.keyword,
                     "Status": row.status,
                     "SEO Title": row.seo_title,
                     "Blogger URL": row.blogger_url,
-                    "Audience": row.target_audience,
                     "Retry Count": row.retry_count,
                     "Last Error": row.last_error,
                     "Updated At": row.updated_at

@@ -82,14 +82,21 @@ def main():
             continue
 
         try:
-            # 5.2 ส่งหัวข้อและคำสำคัญไปแต่งผ่าน Gemini API (ดึงผลลัพธ์ครอบคลุมโซเชียลคอนเทนต์)
+            import json
+            try:
+                blueprint_inputs = json.loads(row.blueprint_inputs_json) if row.blueprint_inputs_json else {}
+            except Exception:
+                blueprint_inputs = {}
+                
             seo_content = gemini_service.generate_blogger_article(
                 topic=topic,
                 keyword=keyword,
                 target_audience=target_audience,
                 business_type=business_type,
                 content_goal=content_goal,
-                tone=tone
+                tone=tone,
+                content_type=row.content_type,
+                blueprint_inputs=blueprint_inputs
             )
             
             # 5.3 รวบรวมข้อมูล HTML สำหรับ Blogger (เนื้อหาหลัก + FAQ + CTA)
