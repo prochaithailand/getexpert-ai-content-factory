@@ -35,7 +35,7 @@ def main():
     # 2. เริ่มทำงานการตั้งค่า Log
     setup_logging()
     logging.info("==================================================")
-    logging.info("เริ่มต้นการรันระบบ GetExpert AI Content Factory - Sprint 2")
+    logging.info("เริ่มต้นการรันระบบ GetExpert AI Content Factory - Sprint 4")
     logging.info("==================================================")
 
     # 3. เริ่มต้นทำงานเปิดคลาสเซอร์วิส (Services Initialization)
@@ -47,7 +47,7 @@ def main():
         logging.critical(f"ไม่สามารถเริ่มใช้งานเซอร์วิส Google/Gemini ได้: {e}")
         return
 
-    # 4. อ่านหัวข้อรอประมวลผลจาก Google Sheets (ดึงคอลัมน์ A:T)
+    # 4. อ่านหัวข้อรอประมวลผลจาก Google Sheets (ดึงคอลัมน์ A:AE)
     try:
         waiting_rows = sheets_service.read_waiting_rows()
     except Exception as e:
@@ -64,7 +64,15 @@ def main():
         topic = row.topic
         keyword = row.keyword
         
-        logging.info(f"เริ่มประมวลผลแถวที่ {row_idx} | หัวข้อ: {topic} | คำสำคัญ: {keyword}")
+        # ดึงฟิลด์ป้อนเข้าใหม่ของ Sprint 4
+        target_audience = row.target_audience
+        business_type = row.business_type
+        content_goal = row.content_goal
+        tone = row.tone
+        
+        logging.info(f"เริ่มประมวลผลแถวที่ {row_idx} | หัวข้อ: {topic} | คีย์เวิร์ด: {keyword}")
+        if target_audience:
+            logging.info(f"-> กลุ่มเป้าหมาย: {target_audience} | ธุรกิจ: {business_type} | เป้าหมาย: {content_goal} | โทน: {tone}")
         
         # 5.1 อัปเดตเปลี่ยนสถานะแถวเป็น 'Processing' ทันทีเพื่อล็อกการเขียนบทความ
         try:
@@ -74,8 +82,15 @@ def main():
             continue
 
         try:
-            # 5.2 ส่งหัวข้อและคำสำคัญไปแต่งผ่าน Gemini API (Structured Output - SEOContent)
-            seo_content = gemini_service.generate_blogger_article(topic, keyword)
+            # 5.2 ส่งหัวข้อและคำสำคัญไปแต่งผ่าน Gemini API (ดึงผลลัพธ์ครอบคลุมโซเชียลคอนเทนต์)
+            seo_content = gemini_service.generate_blogger_article(
+                topic=topic,
+                keyword=keyword,
+                target_audience=target_audience,
+                business_type=business_type,
+                content_goal=content_goal,
+                tone=tone
+            )
             
             # 5.3 รวบรวมข้อมูล HTML สำหรับ Blogger (เนื้อหาหลัก + FAQ + CTA)
             # สร้าง FAQ HTML
@@ -97,7 +112,7 @@ def main():
             # 5.4 ส่งเนื้อหา HTML และชื่อหัวข้อไปอัปโหลดขึ้น Blogger แบบร่าง (Draft)
             post_result = blogger_service.create_draft_post(seo_content.title, full_html)
             
-            # 5.5 อัปเดตข้อมูลผลลัพธ์ลง Google Sheets ปรับสถานะเป็น 'Drafted' (Retry Count = 0)
+            # 5.5 อัปเดตข้อมูลผลลัพธ์ SEO, Blogger และ Social Content Pack กลับลง Google Sheets (Retry Count = 0)
             sheets_service.update_row_success(
                 row_idx=row_idx,
                 seo_content=seo_content,
@@ -120,7 +135,7 @@ def main():
         # เว้นวรรคการรันเพื่อเลี่ยงปัญหาความถี่ปัญญาประดิษฐ์และ API
         time.sleep(3)
 
-    logging.info("สิ้นสุดการทำงานระบบ AI Blogger Automation รายวันประจำ Sprint 2")
+    logging.info("สิ้นสุดการทำงานระบบ AI Blogger Automation รายวันประจำ Sprint 4")
 
 if __name__ == "__main__":
     main()

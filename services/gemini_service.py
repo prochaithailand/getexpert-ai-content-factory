@@ -19,11 +19,26 @@ class GeminiService:
         self.client = genai.Client(api_key=self.api_key)
 
     @retry(max_retries=3, delays=[2, 5, 10])
-    def generate_blogger_article(self, topic: str, keyword: str) -> SEOContent:
+    def generate_blogger_article(
+        self, 
+        topic: str, 
+        keyword: str,
+        target_audience: str = "",
+        business_type: str = "",
+        content_goal: str = "",
+        tone: str = ""
+    ) -> SEOContent:
         """
-        เรียกใช้งานโมเดล Gemini เพื่อเขียนบทความและส่งผลลัพธ์เป็นโครงสร้าง JSON (SEOContent)
+        เรียกใช้งานโมเดล Gemini เพื่อเขียนบทความและแพ็คโซเชียลคอนเทนต์ คืนผลลัพธ์เป็นวัตถุ SEOContent
         """
-        prompt = get_blogger_seo_prompt(topic, keyword)
+        prompt = get_blogger_seo_prompt(
+            topic=topic,
+            keyword=keyword,
+            target_audience=target_audience,
+            business_type=business_type,
+            content_goal=content_goal,
+            tone=tone
+        )
         logging.info(f"กำลังส่งสัญญานเรียกเขียนบทความไปยัง Gemini Model: '{self.model_name}'...")
         
         try:

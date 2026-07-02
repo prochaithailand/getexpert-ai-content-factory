@@ -59,7 +59,7 @@ def get_google_credentials():
 
 class SheetsService:
     """
-    บริการจัดการ Google Sheets สำหรับการดึงแถวรอโพสต์ และอัปเดตผลลัพธ์ SEO/Blogger
+    บริการจัดการ Google Sheets สำหรับการดึงแถวรอโพสต์ และอัปเดตผลลัพธ์ SEO/Blogger/Social
     """
     def __init__(self):
         self.creds = get_google_credentials()
@@ -70,9 +70,9 @@ class SheetsService:
     @retry(max_retries=3, delays=[2, 5, 10])
     def read_waiting_rows(self) -> List[SheetRow]:
         """
-        ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:T (20 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
+        ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:AE (31 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
         """
-        range_name = f"{self.sheet_name}!A:T"
+        range_name = f"{self.sheet_name}!A:AE"
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range=range_name).execute()
@@ -86,8 +86,8 @@ class SheetsService:
 
         waiting_rows = []
         for idx, row in enumerate(values[1:], start=2):
-            # เติมแถวให้ครบ 20 คอลัมน์เพื่อความปลอดภัยจากการดึง Index
-            padded = row + [''] * (20 - len(row))
+            # เติมแถวให้ครบ 31 คอลัมน์เพื่อความปลอดภัยย้อนหลังและป้องกัน Index Error
+            padded = row + [''] * (31 - len(row))
             status = padded[3].strip() if padded[3] else ""
             
             if status.lower() == 'waiting':
@@ -112,7 +112,19 @@ class SheetsService:
                     last_error=padded[16],
                     processed_at=padded[17],
                     created_at=padded[18],
-                    updated_at=padded[19]
+                    updated_at=padded[19],
+                    # ฟิลด์ใหม่ของ Sprint 4
+                    target_audience=padded[20],
+                    business_type=padded[21],
+                    content_goal=padded[22],
+                    tone=padded[23],
+                    facebook_post=padded[24],
+                    facebook_hashtags=padded[25],
+                    tiktok_hook=padded[26],
+                    tiktok_script=padded[27],
+                    youtube_shorts_script=padded[28],
+                    youtube_title=padded[29],
+                    youtube_description=padded[30]
                 )
                 waiting_rows.append(sheet_row)
         
@@ -148,12 +160,13 @@ class SheetsService:
     def update_row_success(self, row_idx: int, seo_content: SEOContent, post_id: str, url: str, retry_count: int):
         """
         อัปเดตข้อมูลบทความที่อัปโหลดสำเร็จลงใน Google Sheet
-        เขียนคลุมคอลัมน์ D ถึง R (15 คอลัมน์) เพื่อความต่อเนื่องของข้อมูลและรักษาสิทธิ์ของคอลัมน์คีย์อื่นๆ
+        เขียนแยก 2 ส่วนเพื่อความปลอดภัยและไม่เขียนทับคอลัมน์อินพุต (Created At (S) และ Target Audience..Tone (U:X))
         """
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         related_kws = ", ".join(seo_content.related_keywords)
         
-        values = [[
+        # 1. อัปเดตฝั่ง SEO & Blogger (D:R) รวม 15 คอลัมน์
+        values_seo = [[
             "Drafted",                           # D: Status
             seo_content.seo_title,               # E: SEO Title
             seo_content.meta_description,        # F: Meta Description
@@ -167,16 +180,37 @@ class SheetsService:
             seo_content.featured_image.style,    # N: Image Style
             seo_content.featured_image.concept,  # O: Image Concept
             str(retry_count),                    # P: Retry Count
-            "",                                  # Q: Last Error (เคลียร์ข้อผิดพลาดเดิม)
+            "",                                  # Q: Last Error
             now_str                              # R: Processed At
         ]]
         
+        # 2. อัปเดตฝั่ง Social Content Pack (Y:AE) รวม 7 คอลัมน์
+        facebook_hashtags_str = ", ".join(seo_content.social_pack.facebook_hashtags)
+        values_social = [[
+            seo_content.social_pack.facebook_post,
+            facebook_hashtags_str,
+            seo_content.social_pack.tiktok_hook,
+            seo_content.social_pack.tiktok_script,
+            seo_content.social_pack.youtube_shorts_script,
+            seo_content.social_pack.youtube_title,
+            seo_content.social_pack.youtube_description
+        ]]
+        
         try:
+            # ยิงอัปเดตส่วนแรก (D:R)
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.spreadsheet_id,
                 range=f"{self.sheet_name}!D{row_idx}:R{row_idx}",
                 valueInputOption="RAW",
-                body={"values": values}
+                body={"values": values_seo}
+            ).execute()
+            
+            # ยิงอัปเดตส่วนที่สอง (Y:AE)
+            self.service.spreadsheets().values().update(
+                spreadsheetId=self.spreadsheet_id,
+                range=f"{self.sheet_name}!Y{row_idx}:AE{row_idx}",
+                valueInputOption="RAW",
+                body={"values": values_social}
             ).execute()
             
             # อัปเดต Updated At ช่อง T
@@ -187,9 +221,9 @@ class SheetsService:
                 body={"values": [[now_str]]}
             ).execute()
             
-            logging.info(f"บันทึกประมวลผลข้อมูลบทความ SEO ลงแผ่นชีตแถวที่ {row_idx} สำเร็จ")
+            logging.info(f"บันทึกประมวลผลข้อมูลบทความ SEO และ Social Pack ลงชีตแถวที่ {row_idx} สำเร็จ")
         except Exception as e:
-            logging.error(f"การบันทึกบทความสำเร็จลงแผ่นชีตแถวที่ {row_idx} ล้มเหลว: {e}")
+            logging.error(f"การบันทึกบทความและโซเชียลสำเร็จลงแผ่นชีตแถวที่ {row_idx} ล้มเหลว: {e}")
             raise e
 
     @retry(max_retries=3, delays=[2, 5, 10])
@@ -229,9 +263,17 @@ class SheetsService:
             raise e
 
     @retry(max_retries=3, delays=[2, 5, 10])
-    def add_new_row(self, topic: str, keyword: str) -> int:
+    def add_new_row(
+        self, 
+        topic: str, 
+        keyword: str,
+        target_audience: str = "",
+        business_type: str = "",
+        content_goal: str = "",
+        tone: str = ""
+    ) -> int:
         """
-        เพิ่มหัวข้อบทความและคีย์เวิร์ดแถวใหม่ลงใน Google Sheet (สำหรับ Web App ป้อนข้อมูล)
+        เพิ่มหัวข้อบทความและคำสั่งรายละเอียดใหม่ลงใน Google Sheet (รองรับฟิลด์ใหม่ของ Sprint 4)
         """
         # อ่านข้อมูลคอลัมน์ A เพื่อคำนวณหา ID ถัดไป
         range_name = f"{self.sheet_name}!A:A"
@@ -251,19 +293,26 @@ class SheetsService:
                 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # เตรียมชุดข้อมูล 20 คอลัมน์ (A:T)
-        # ID, Topic, Keyword, Status=Waiting, ..., Created At, Updated At
+        # เตรียมชุดข้อมูล 31 คอลัมน์ (A:AE)
         row_data = [
             str(new_id),         # A: ID
             topic,               # B: Topic
             keyword,             # C: Keyword
             "Waiting",           # D: Status
-            "", "", "", "", "", "", "", "", "", "", "", "", "", "", # E to R
+            # E to R (14 columns empty outputs)
+            "", "", "", "", "", "", "", "", "", "", "", "", "", "", 
             now_str,             # S: Created At
-            now_str              # T: Updated At
+            now_str,             # T: Updated At
+            # U to X (ฟิลด์ป้อนเข้าใหม่ของ Sprint 4)
+            target_audience,     # U: Target Audience
+            business_type,       # V: Business Type
+            content_goal,        # W: Content Goal
+            tone,                # X: Tone
+            # Y to AE (7 columns empty social outputs)
+            "", "", "", "", "", "", ""
         ]
         
-        write_range = f"{self.sheet_name}!A{new_row_idx}:T{new_row_idx}"
+        write_range = f"{self.sheet_name}!A{new_row_idx}:AE{new_row_idx}"
         self.service.spreadsheets().values().update(
             spreadsheetId=self.spreadsheet_id,
             range=write_range,
@@ -271,15 +320,15 @@ class SheetsService:
             body={"values": [row_data]}
         ).execute()
         
-        logging.info(f"เพิ่มหัวข้อใหม่แถวที่ {new_row_idx} (ID: {new_id}) ลงชีตเรียบร้อยแล้ว")
+        logging.info(f"เพิ่มหัวข้อใหม่และข้อมูลอินพุตแถวที่ {new_row_idx} (ID: {new_id}) ลงชีตสำเร็จ")
         return new_row_idx
 
     @retry(max_retries=3, delays=[2, 5, 10])
     def get_row_by_index(self, row_idx: int) -> SheetRow:
         """
-        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx)
+        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx) รองรับ 31 คอลัมน์
         """
-        range_name = f"{self.sheet_name}!A{row_idx}:T{row_idx}"
+        range_name = f"{self.sheet_name}!A{row_idx}:AE{row_idx}"
         result = self.service.spreadsheets().values().get(
             spreadsheetId=self.spreadsheet_id, range=range_name).execute()
         values = result.get('values', [])
@@ -287,7 +336,7 @@ class SheetsService:
         if not values:
             raise ValueError(f"ไม่พบข้อมูลในแถวที่ {row_idx}")
             
-        padded = values[0] + [''] * (20 - len(values[0]))
+        padded = values[0] + [''] * (31 - len(values[0]))
         return SheetRow(
             row_idx=row_idx,
             id=padded[0],
@@ -309,15 +358,27 @@ class SheetsService:
             last_error=padded[16],
             processed_at=padded[17],
             created_at=padded[18],
-            updated_at=padded[19]
+            updated_at=padded[19],
+            # ฟิลด์ใหม่ของ Sprint 4
+            target_audience=padded[20],
+            business_type=padded[21],
+            content_goal=padded[22],
+            tone=padded[23],
+            facebook_post=padded[24],
+            facebook_hashtags=padded[25],
+            tiktok_hook=padded[26],
+            tiktok_script=padded[27],
+            youtube_shorts_script=padded[28],
+            youtube_title=padded[29],
+            youtube_description=padded[30]
         )
 
     @retry(max_retries=3, delays=[2, 5, 10])
     def read_all_rows(self) -> List[SheetRow]:
         """
-        ดึงข้อมูลทุกแถวเพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
+        ดึงข้อมูลทุกแถวคิวประมวลผล (ช่วง A:AE) เพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
         """
-        range_name = f"{self.sheet_name}!A:T"
+        range_name = f"{self.sheet_name}!A:AE"
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range=range_name).execute()
@@ -331,7 +392,7 @@ class SheetsService:
 
         all_rows = []
         for idx, row in enumerate(values[1:], start=2):
-            padded = row + [''] * (20 - len(row))
+            padded = row + [''] * (31 - len(row))
             sheet_row = SheetRow(
                 row_idx=idx,
                 id=padded[0],
@@ -353,7 +414,19 @@ class SheetsService:
                 last_error=padded[16],
                 processed_at=padded[17],
                 created_at=padded[18],
-                updated_at=padded[19]
+                updated_at=padded[19],
+                # ฟิลด์ใหม่ของ Sprint 4
+                target_audience=padded[20],
+                business_type=padded[21],
+                content_goal=padded[22],
+                tone=padded[23],
+                facebook_post=padded[24],
+                facebook_hashtags=padded[25],
+                tiktok_hook=padded[26],
+                tiktok_script=padded[27],
+                youtube_shorts_script=padded[28],
+                youtube_title=padded[29],
+                youtube_description=padded[30]
             )
             all_rows.append(sheet_row)
         return all_rows
