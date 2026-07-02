@@ -315,7 +315,7 @@ if is_demo:
             </div>
             """, unsafe_allow_html=True)
             
-        st.markdown("</div>", unsafe_allowed_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 else:
     # ----------------------------------------------------
@@ -361,7 +361,7 @@ else:
                         st.success(f"ส่งคำขอเข้าสู่คิวงานเรียบร้อยแล้ว! (พิกัดแถวที่ {row_idx})")
                     except Exception as error:
                         st.error(f"เกิดปัญหาในการบันทึกลงชีต: {error}")
-        st.markdown("</div>", unsafe_allowed_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col2:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
