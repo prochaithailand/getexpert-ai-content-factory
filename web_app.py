@@ -259,7 +259,7 @@ def show_user_referral_partner_section(user_email, key_suffix):
             if st.button("📊 โหลดข้อมูลคอมมิชชั่นแนะนำของฉัน", key=f"load_partner_comm_btn_{key_suffix}"):
                 with st.spinner("กำลังดึงข้อมูลคอมมิชชั่น..."):
                     try:
-                        all_logs = sheets_service.service.service.spreadsheets().values().get(
+                        all_logs = sheets_service.service.spreadsheets().values().get(
                             spreadsheetId=sheets_service.spreadsheet_id, range="Referral Logs!A:I").execute().get('values', [])
                         
                         partner_logs = []

@@ -738,7 +738,7 @@ class SheetsService:
         ])
         
         try:
-            result = self.service.service.spreadsheets().values().get(
+            result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range="Users!A:P").execute()
             values = result.get('values', [])
             
@@ -794,13 +794,13 @@ class SheetsService:
         self.ensure_worksheet_exists("Referral Logs", headers)
         
         try:
-            result = self.service.service.spreadsheets().values().get(
+            result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range="Referral Logs!A:A").execute()
             values = result.get('values', [])
             new_row = len(values) + 1 if values else 2
             
             write_range = f"Referral Logs!A{new_row}:I{new_row}"
-            self.service.service.spreadsheets().values().update(
+            self.service.spreadsheets().values().update(
                 spreadsheetId=self.spreadsheet_id,
                 range=write_range,
                 valueInputOption="RAW",

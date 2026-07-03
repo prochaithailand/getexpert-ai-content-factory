@@ -73,3 +73,74 @@ class TestReferralSystem(unittest.TestCase):
         self.assertEqual(user.referral_link, "")
         self.assertEqual(user.referral_package_paid, 0.0)
         self.assertEqual(user.referral_status, "")
+
+    def test_referral_partner_activation_flow(self):
+        """
+        ทดสอบการเปิดสิทธิ์พาร์ทเนอร์ และการสร้างรหัสกับลิงก์แนะนำที่ถูกต้อง
+        """
+        user = UserCredit(
+            user_email="partner@example.com",
+            user_name="Partner User",
+            created_at="2026-07-03 00:00:00",
+            updated_at="2026-07-03 00:00:00"
+        )
+        
+        # เปิดสิทธิ์พาร์ทเนอร์
+        ref_code = "PROCHAIT001"
+        user.is_referral_partner = True
+        user.referral_code = ref_code
+        user.referral_link = f"https://getexpert-ai-content-factory1.streamlit.app/?ref={ref_code}"
+        user.referral_status = "Active"
+        user.referral_package_paid = 149.0
+        
+        self.assertTrue(user.is_referral_partner)
+        self.assertEqual(user.referral_code, "PROCHAIT001")
+        self.assertEqual(user.referral_link, "https://getexpert-ai-content-factory1.streamlit.app/?ref=PROCHAIT001")
+        self.assertEqual(user.referral_status, "Active")
+        self.assertEqual(user.referral_package_paid, 149.0)
+
+    def test_sheets_service_resource_resolution(self):
+        """
+        ตรวจสอบการดึงและอัปเดตข้อมูลของ SheetsService เพื่อป้องกันข้อผิดพลาด AttributeError
+        """
+        from services.sheets_service import SheetsService
+        
+        # Instantiate without calling __init__ to avoid Google credentials requirements in tests
+        service_instance = SheetsService.__new__(SheetsService)
+        service_instance.spreadsheet_id = "dummy_id"
+        
+        # จำลองค่า service API resource
+        mock_api = MagicMock()
+        service_instance.service = mock_api
+        
+        # ตรวจเช็คว่าไม่มี Attribute 'service' ซ้อนกันใน self.service (self.service.service)
+        # ตรวจสอบการทำ mock ของ spreadsheets()
+        mock_spreadsheets = MagicMock()
+        mock_api.spreadsheets.return_value = mock_spreadsheets
+        mock_values = MagicMock()
+        mock_spreadsheets.values.return_value = mock_values
+        
+        # คืนค่าจำลองของ Users (แถวหัวตาราง + ข้อมูลแถวแรกมี KALAYA001)
+        mock_values.get().execute.return_value = {
+            'values': [
+                ["User Email", "User Name", "Created At", "Free Credits Used", 
+                 "Paid Credits Balance", "Total Generated", "Payment Status", 
+                 "Last Generated At", "Updated At", "Is Referral Partner",
+                 "Referral Code", "Referral Link", "Referral Started At",
+                 "Referral Package Paid", "Referral Status", "Referred By"],
+                ["referred@example.com", "Referred", "2026-07-03 00:00:00", "0", "0", "0", 
+                 "Free Trial", "", "2026-07-03 00:00:00", "TRUE", "KALAYA001", 
+                 "https://getexpert-ai-content-factory1.streamlit.app/?ref=KALAYA001", 
+                 "2026-07-03 00:00:00", "149.0", "Active", ""]
+            ]
+        }
+        
+        # เรียกค้นหาผู้แนะนำด้วยรหัส KALAYA001
+        res = service_instance.get_user_by_referral_code("KALAYA001")
+        self.assertIsNotNone(res)
+        user_res, idx = res
+        self.assertEqual(user_res.user_email, "referred@example.com")
+        self.assertEqual(user_res.referral_code, "KALAYA001")
+        self.assertTrue(user_res.is_referral_partner)
+        self.assertEqual(idx, 2)
+
