@@ -61,11 +61,16 @@ st.markdown("""
 def get_sheets_service():
     return SheetsService()
 
+sheets_service = None
 try:
     sheets_service = get_sheets_service()
 except Exception as e:
-    st.error(f"ไม่สามารถเชื่อมต่อ Google Sheets API ได้: {e}")
-    st.stop()
+    logging.error(f"ไม่สามารถเชื่อมต่อ Google Sheets API ได้: {e}")
+
+@st.cache_resource
+def get_credit_service():
+    from services.credit_service import CreditService
+    return CreditService(sheets_service)
 
 # โหลดข้อมูล Blueprint ทั้งหมด
 blueprints_data = BlueprintService.get_all_blueprints()
@@ -121,8 +126,7 @@ if is_demo:
     status_msg = ""
     
     if user_email:
-        from services.credit_service import CreditService
-        credit_service = CreditService(sheets_service)
+        credit_service = get_credit_service()
         # ตรวจสอบหรือสร้างผู้ใช้
         credit_service.get_or_create_user(user_email, user_name)
         is_eligible, credit_type, credit_balance, status_msg = credit_service.check_credit_eligibility(user_email)
@@ -351,8 +355,7 @@ if is_demo:
                                 )
                                 
                                 # 5. หักแต้มเครดิตผู้ใช้อัตโนมัติ (Sprint 6)
-                                from services.credit_service import CreditService
-                                credit_service = CreditService(sheets_service)
+                                credit_service = get_credit_service()
                                 credit_service.consume_credit(
                                     email=user_email,
                                     credit_type=credit_type,
@@ -399,8 +402,7 @@ if is_demo:
                             st.error(f"เกิดข้อผิดพลาดในการประมวลผลสัญญาน: {err}")
                             # บันทึกประวัติความล้มเหลวลงในชีต Usage Logs โดยไม่หักแต้มเครดิต
                             try:
-                                from services.credit_service import CreditService
-                                credit_service = CreditService(sheets_service)
+                                credit_service = get_credit_service()
                                 credit_service.log_failed_generation(
                                     email=user_email,
                                     credit_type=credit_type,
@@ -523,8 +525,7 @@ else:
     status_msg = ""
 
     if user_email:
-        from services.credit_service import CreditService
-        credit_service = CreditService(sheets_service)
+        credit_service = get_credit_service()
         # ตรวจสอบหรือสร้างผู้ใช้
         credit_service.get_or_create_user(user_email, user_name)
         is_eligible, credit_type, credit_balance, status_msg = credit_service.check_credit_eligibility(user_email)

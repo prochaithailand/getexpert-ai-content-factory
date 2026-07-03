@@ -221,5 +221,43 @@ class TestCreditGate(unittest.TestCase):
         self.assertIn("Failed:", log_arg.status)
         self.assertIn("Gemini rate limit error", log_arg.status)
 
+    def test_sheets_service_failure_handling(self):
+        """
+        เมื่อ Google Sheets ล้มเหลว (เช่น SSL/network error)
+        - get_or_create_user ต้องไม่พัง และคืนค่าเป็น fallback user ใน memory
+        - check_credit_eligibility ต้องไม่พัง คืนค่าเป็น blocked พร้อมส่งคำเตือน UI
+        - consume_credit ต้องไม่พัง คืนค่าเป็น (False, msg)
+        """
+        sheets_mock = MagicMock()
+        # จำลองการเชื่อมต่อล้มเหลวด้วยการยกเลิก Exception
+        sheets_mock.get_user_by_email.side_effect = Exception("SSL RECORD_LAYER_FAILURE")
+        sheets_mock.save_user_credit.side_effect = Exception("Sheets write error")
+
+        credit_service = CreditService(sheets_service=sheets_mock)
+        
+        # 1. ทดสอบ get_or_create_user ต้องสามารถทำงานต่อได้โดยใช้ fallback ใน memory
+        fallback_user = credit_service.get_or_create_user("fail_conn@example.com", "Test Fail")
+        self.assertIsNotNone(fallback_user)
+        self.assertEqual(fallback_user.user_email, "fail_conn@example.com")
+        self.assertEqual(fallback_user.free_credits_used, 0) # ปลอดภัยเริ่มต้น
+        
+        # 2. ทดสอบ check_credit_eligibility ต้องส่งคืนสถานะ blocked เพื่อความปลอดภัยของโควตา พร้อมคำเตือน
+        is_eligible, credit_type, balance, msg = credit_service.check_credit_eligibility("fail_conn@example.com")
+        self.assertFalse(is_eligible)
+        self.assertEqual(credit_type, "blocked")
+        self.assertEqual(balance, 0)
+        self.assertIn("ระบบตรวจสอบเครดิตขัดข้องชั่วคราว", msg)
+        
+        # 3. ทดสอบ consume_credit ต้องไม่พัง ส่งคืนค่า False
+        success, err_msg = credit_service.consume_credit(
+            email="fail_conn@example.com",
+            credit_type="free",
+            topic="หัวข้อทดสอบ",
+            content_type="business",
+            blueprint_label="ธุรกิจ"
+        )
+        self.assertFalse(success)
+        self.assertIn("เข้าถึงชีตข้อมูล", err_msg)
+
 if __name__ == "__main__":
     unittest.main()

@@ -80,6 +80,8 @@ class SheetsService:
     """
     บริการจัดการ Google Sheets สำหรับการดึงแถวรอโพสต์ และอัปเดตผลลัพธ์ SEO/Blogger/Social
     """
+    _checked_sheets = set()
+
     def __init__(self):
         self.creds = get_google_credentials()
         self.service = build('sheets', 'v4', credentials=self.creds)
@@ -487,6 +489,9 @@ class SheetsService:
         """
         ตรวจสอบและสร้าง Worksheet ใหม่ใน Google Sheets หากยังไม่มีอยู่
         """
+        if sheet_title in self._checked_sheets:
+            return
+            
         try:
             spreadsheet = self.service.spreadsheets().get(spreadsheetId=self.spreadsheet_id).execute()
             sheets = spreadsheet.get('sheets', [])
@@ -515,6 +520,8 @@ class SheetsService:
                     body={"values": [expected_headers]}
                 ).execute()
                 logging.info(f"จัดสร้างชีตย่อย '{sheet_title}' และป้อนหัวตารางสมบูรณ์")
+            
+            self._checked_sheets.add(sheet_title)
         except Exception as e:
             logging.error(f"ไม่สามารถตรวจสอบ/สร้างชีตย่อย '{sheet_title}' ได้: {e}")
             raise e
