@@ -123,3 +123,6 @@ class SheetRow(BaseModel):
     blueprint_label: Optional[str] = ""            # AG
     blueprint_inputs_json: Optional[str] = "{}"    # AH
     output_types_list: Optional[str] = ""          # AI
+    
+    # ฟิลด์ใหม่ของ Sprint 6 (คอลัมน์ AJ)
+    user_email: Optional[str] = ""                 # AJ

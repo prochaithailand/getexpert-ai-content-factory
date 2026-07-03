@@ -89,9 +89,9 @@ class SheetsService:
     @retry(max_retries=3, delays=[2, 5, 10])
     def read_waiting_rows(self) -> List[SheetRow]:
         """
-        ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:AI (35 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
+        ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:AJ (36 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
         """
-        range_name = f"{self.sheet_name}!A:AI"
+        range_name = f"{self.sheet_name}!A:AJ"
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range=range_name).execute()
@@ -105,8 +105,8 @@ class SheetsService:
 
         waiting_rows = []
         for idx, row in enumerate(values[1:], start=2):
-            # เติมแถวให้ครบ 35 คอลัมน์เพื่อความปลอดภัยย้อนหลังและป้องกัน Index Error
-            padded = row + [''] * (35 - len(row))
+            # เติมแถวให้ครบ 36 คอลัมน์เพื่อความปลอดภัยย้อนหลังและป้องกัน Index Error
+            padded = row + [''] * (36 - len(row))
             status = padded[3].strip() if padded[3] else ""
             
             if status.lower() == 'waiting':
@@ -148,7 +148,9 @@ class SheetsService:
                     content_type=padded[31] if padded[31] else "business",
                     blueprint_label=padded[32],
                     blueprint_inputs_json=padded[33] if padded[33] else "{}",
-                    output_types_list=padded[34]
+                    output_types_list=padded[34],
+                    # ฟิลด์ใหม่ของ Sprint 6
+                    user_email=padded[35]
                 )
                 waiting_rows.append(sheet_row)
         
@@ -298,10 +300,11 @@ class SheetsService:
         content_type: str = "business",
         blueprint_label: str = "",
         blueprint_inputs_json: str = "{}",
-        output_types_list: str = ""
+        output_types_list: str = "",
+        user_email: str = ""
     ) -> int:
         """
-        เพิ่มหัวข้อบทความและคำสั่งรายละเอียดใหม่ลงใน Google Sheet (รองรับฟิลด์ใหม่ของ Sprint 5)
+        เพิ่มหัวข้อบทความและคำสั่งรายละเอียดใหม่ลงใน Google Sheet (รองรับฟิลด์ใหม่ของ Sprint 5 และ 6)
         """
         # อ่านข้อมูลคอลัมน์ A เพื่อคำนวณหา ID ถัดไป
         range_name = f"{self.sheet_name}!A:A"
@@ -321,7 +324,7 @@ class SheetsService:
                 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # เตรียมชุดข้อมูล 35 คอลัมน์ (A:AI)
+        # เตรียมชุดข้อมูล 36 คอลัมน์ (A:AJ)
         row_data = [
             str(new_id),         # A: ID
             topic,               # B: Topic
@@ -342,10 +345,11 @@ class SheetsService:
             content_type,        # AF: Content Type
             blueprint_label,     # AG: Blueprint Label
             blueprint_inputs_json, # AH: Blueprint Inputs JSON
-            output_types_list    # AI: Output Types List
+            output_types_list,   # AI: Output Types List
+            user_email           # AJ: User Email (Sprint 6)
         ]
         
-        write_range = f"{self.sheet_name}!A{new_row_idx}:AI{new_row_idx}"
+        write_range = f"{self.sheet_name}!A{new_row_idx}:AJ{new_row_idx}"
         self.service.spreadsheets().values().update(
             spreadsheetId=self.spreadsheet_id,
             range=write_range,
@@ -359,9 +363,9 @@ class SheetsService:
     @retry(max_retries=3, delays=[2, 5, 10])
     def get_row_by_index(self, row_idx: int) -> SheetRow:
         """
-        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx) รองรับ 35 คอลัมน์
+        ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx) รองรับ 36 คอลัมน์
         """
-        range_name = f"{self.sheet_name}!A{row_idx}:AI{row_idx}"
+        range_name = f"{self.sheet_name}!A{row_idx}:AJ{row_idx}"
         result = self.service.spreadsheets().values().get(
             spreadsheetId=self.spreadsheet_id, range=range_name).execute()
         values = result.get('values', [])
@@ -369,7 +373,7 @@ class SheetsService:
         if not values:
             raise ValueError(f"ไม่พบข้อมูลในแถวที่ {row_idx}")
             
-        padded = values[0] + [''] * (35 - len(values[0]))
+        padded = values[0] + [''] * (36 - len(values[0]))
         return SheetRow(
             row_idx=row_idx,
             id=padded[0],
@@ -408,15 +412,17 @@ class SheetsService:
             content_type=padded[31] if padded[31] else "business",
             blueprint_label=padded[32],
             blueprint_inputs_json=padded[33] if padded[33] else "{}",
-            output_types_list=padded[34]
+            output_types_list=padded[34],
+            # ฟิลด์ใหม่ของ Sprint 6
+            user_email=padded[35]
         )
 
     @retry(max_retries=3, delays=[2, 5, 10])
     def read_all_rows(self) -> List[SheetRow]:
         """
-        ดึงข้อมูลทุกแถวคิวประมวลผล (ช่วง A:AI) เพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
+        ดึงข้อมูลทุกแถวคิวประมวลผล (ช่วง A:AJ) เพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
         """
-        range_name = f"{self.sheet_name}!A:AI"
+        range_name = f"{self.sheet_name}!A:AJ"
         try:
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id, range=range_name).execute()
@@ -430,7 +436,7 @@ class SheetsService:
 
         all_rows = []
         for idx, row in enumerate(values[1:], start=2):
-            padded = row + [''] * (35 - len(row))
+            padded = row + [''] * (36 - len(row))
             sheet_row = SheetRow(
                 row_idx=idx,
                 id=padded[0],
@@ -469,7 +475,218 @@ class SheetsService:
                 content_type=padded[31] if padded[31] else "business",
                 blueprint_label=padded[32],
                 blueprint_inputs_json=padded[33] if padded[33] else "{}",
-                output_types_list=padded[34]
+                output_types_list=padded[34],
+                # ฟิลด์ใหม่ของ Sprint 6
+                user_email=padded[35]
             )
             all_rows.append(sheet_row)
         return all_rows
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def ensure_worksheet_exists(self, sheet_title: str, expected_headers: List[str]):
+        """
+        ตรวจสอบและสร้าง Worksheet ใหม่ใน Google Sheets หากยังไม่มีอยู่
+        """
+        try:
+            spreadsheet = self.service.spreadsheets().get(spreadsheetId=self.spreadsheet_id).execute()
+            sheets = spreadsheet.get('sheets', [])
+            sheet_titles = [s['properties']['title'] for s in sheets]
+            
+            if sheet_title not in sheet_titles:
+                logging.info(f"ไม่พบชีตย่อย '{sheet_title}' กำลังดำเนินการจัดสร้างแผ่นใหม่...")
+                body = {
+                    'requests': [
+                        {
+                            'addSheet': {
+                                'properties': {
+                                    'title': sheet_title
+                                }
+                            }
+                        }
+                    ]
+                }
+                self.service.spreadsheets().batchUpdate(spreadsheetId=self.spreadsheet_id, body=body).execute()
+                
+                # เขียนหัวตารางทันทีที่สร้าง
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=f"{sheet_title}!A1",
+                    valueInputOption="RAW",
+                    body={"values": [expected_headers]}
+                ).execute()
+                logging.info(f"จัดสร้างชีตย่อย '{sheet_title}' และป้อนหัวตารางสมบูรณ์")
+        except Exception as e:
+            logging.error(f"ไม่สามารถตรวจสอบ/สร้างชีตย่อย '{sheet_title}' ได้: {e}")
+            raise e
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def get_user_by_email(self, email: str):
+        """
+        ค้นหาข้อมูลผู้ใช้งานจากอีเมลในชีต Users คืนค่าเป็นโมเดล UserCredit หรือ None
+        """
+        self.ensure_worksheet_exists("Users", [
+            "User Email", "User Name", "Created At", "Free Credits Used", 
+            "Paid Credits Balance", "Total Generated", "Payment Status", 
+            "Last Generated At", "Updated At"
+        ])
+        
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id, range="Users!A:I").execute()
+            values = result.get('values', [])
+            
+            if not values or len(values) <= 1:
+                return None
+                
+            email_lower = email.strip().lower()
+            for idx, row in enumerate(values[1:], start=2):
+                if row and row[0].strip().lower() == email_lower:
+                    padded = row + [''] * (9 - len(row))
+                    from models.credit_models import UserCredit
+                    return UserCredit(
+                        user_email=padded[0],
+                        user_name=padded[1],
+                        created_at=padded[2],
+                        free_credits_used=int(padded[3]) if padded[3].isdigit() else 0,
+                        paid_credits_balance=int(padded[4]) if padded[4].isdigit() else 0,
+                        total_generated=int(padded[5]) if padded[5].isdigit() else 0,
+                        payment_status=padded[6] if padded[6] else "Free Trial",
+                        last_generated_at=padded[7],
+                        updated_at=padded[8]
+                    ), idx
+            return None
+        except Exception as e:
+            logging.error(f"เกิดข้อผิดพลาดในการค้นหาผู้ใช้ตามอีเมล: {e}")
+            raise e
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def save_user_credit(self, user, row_idx: int = None):
+        """
+        บันทึกหรืออัปเดตข้อมูลผู้ใช้ลงชีต Users
+        """
+        headers = [
+            "User Email", "User Name", "Created At", "Free Credits Used", 
+            "Paid Credits Balance", "Total Generated", "Payment Status", 
+            "Last Generated At", "Updated At"
+        ]
+        self.ensure_worksheet_exists("Users", headers)
+        
+        row_data = [
+            user.user_email,
+            user.user_name,
+            user.created_at,
+            str(user.free_credits_used),
+            str(user.paid_credits_balance),
+            str(user.total_generated),
+            user.payment_status,
+            user.last_generated_at,
+            user.updated_at
+        ]
+        
+        try:
+            if row_idx:
+                # ทำการอัปเดตแถวเดิมที่มีอยู่แล้ว
+                write_range = f"Users!A{row_idx}:I{row_idx}"
+            else:
+                # หาแถวใหม่โดยดูจำนวนแถวปัจจุบัน
+                result = self.service.spreadsheets().values().get(
+                    spreadsheetId=self.spreadsheet_id, range="Users!A:A").execute()
+                values = result.get('values', [])
+                new_row = len(values) + 1 if values else 2
+                write_range = f"Users!A{new_row}:I{new_row}"
+                
+            self.service.spreadsheets().values().update(
+                spreadsheetId=self.spreadsheet_id,
+                range=write_range,
+                valueInputOption="RAW",
+                body={"values": [row_data]}
+            ).execute()
+            logging.info(f"บันทึกผู้ใช้ {user.user_email} สำเร็จที่พิกัด {write_range}")
+        except Exception as e:
+            logging.error(f"ไม่สามารถบันทึกข้อมูลผู้ใช้ลงชีตได้: {e}")
+            raise e
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def add_usage_log(self, log):
+        """
+        บันทึกรายการใช้งานเครดิตลงชีต Usage Logs
+        """
+        headers = [
+            "Timestamp", "User Email", "Content Type", "Blueprint Label", 
+            "Topic", "Credit Type Used", "Credits Before", "Credits After", "Status"
+        ]
+        self.ensure_worksheet_exists("Usage Logs", headers)
+        
+        row_data = [
+            log.timestamp,
+            log.user_email,
+            log.content_type,
+            log.blueprint_label,
+            log.topic,
+            log.credit_type_used,
+            str(log.credits_before),
+            str(log.credits_after),
+            log.status
+        ]
+        
+        try:
+            # เพิ่มต่อท้ายแถวสุดท้าย
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id, range="Usage Logs!A:A").execute()
+            values = result.get('values', [])
+            new_row = len(values) + 1 if values else 2
+            
+            write_range = f"Usage Logs!A{new_row}:I{new_row}"
+            self.service.spreadsheets().values().update(
+                spreadsheetId=self.spreadsheet_id,
+                range=write_range,
+                valueInputOption="RAW",
+                body={"values": [row_data]}
+            ).execute()
+            logging.info(f"บันทึก Usage Log สำหรับ {log.user_email} สำเร็จ")
+        except Exception as e:
+            logging.error(f"ไม่สามารถบันทึก Usage Log ลงชีตได้: {e}")
+            raise e
+
+    @retry(max_retries=3, delays=[2, 5, 10])
+    def add_payment_record(self, payment):
+        """
+        บันทึกข้อมูลการชำระเงินโอนซื้อเครดิตลงชีต Payments
+        """
+        headers = [
+            "Payment Date", "User Email", "Package Name", "Amount", 
+            "Credits Added", "Payment Method", "Slip Status", "Approved By", 
+            "Approved At", "Note"
+        ]
+        self.ensure_worksheet_exists("Payments", headers)
+        
+        row_data = [
+            payment.payment_date,
+            payment.user_email,
+            payment.package_name,
+            str(payment.amount),
+            str(payment.credits_added),
+            payment.payment_method,
+            payment.slip_status,
+            payment.approved_by,
+            payment.approved_at,
+            payment.note
+        ]
+        
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id, range="Payments!A:A").execute()
+            values = result.get('values', [])
+            new_row = len(values) + 1 if values else 2
+            
+            write_range = f"Payments!A{new_row}:J{new_row}"
+            self.service.spreadsheets().values().update(
+                spreadsheetId=self.spreadsheet_id,
+                range=write_range,
+                valueInputOption="RAW",
+                body={"values": [row_data]}
+            ).execute()
+            logging.info(f"บันทึกรายการชำระเงินสำหรับ {payment.user_email} สำเร็จ")
+        except Exception as e:
+            logging.error(f"ไม่สามารถบันทึก Payment Record ลงชีตได้: {e}")
+            raise e

@@ -127,6 +127,24 @@ def main():
                 url=post_result.url,
                 retry_count=0
             )
+            
+            # หักแต้มเครดิตผู้ใช้งานหลังจากเขียนแถวประมวลผลสำเร็จเรียบร้อย (Sprint 6)
+            if row.user_email:
+                try:
+                    from services.credit_service import CreditService
+                    credit_service = CreditService(sheets_service)
+                    is_eligible, credit_type, balance, status_msg = credit_service.check_credit_eligibility(row.user_email)
+                    if is_eligible:
+                        credit_service.consume_credit(
+                            email=row.user_email,
+                            credit_type=credit_type,
+                            topic=topic,
+                            content_type=row.content_type,
+                            blueprint_label=row.blueprint_label
+                        )
+                except Exception as credit_err:
+                    logging.error(f"ไม่สามารถหักเครดิตสำหรับ {row.user_email} ได้: {credit_err}")
+                    
             logging.info(f"ทำรายการแถวที่ {row_idx} สำเร็จลุล่วงแล้ว!")
             
         except Exception as e:
@@ -138,6 +156,23 @@ def main():
                 sheets_service.update_row_failed(row_idx, error_msg, retry_count=3)
             except Exception as sheet_err:
                 logging.error(f"การบันทึกแจ้ง Error ในแถวที่ {row_idx} ผิดพลาด: {sheet_err}")
+                
+            # บันทึกประวัติความล้มเหลวลงในชีต Usage Logs โดยไม่หักแต้มเครดิต (Sprint 6)
+            if row.user_email:
+                try:
+                    from services.credit_service import CreditService
+                    credit_service = CreditService(sheets_service)
+                    is_eligible, credit_type, balance, status_msg = credit_service.check_credit_eligibility(row.user_email)
+                    credit_service.log_failed_generation(
+                        email=row.user_email,
+                        credit_type=credit_type,
+                        topic=topic,
+                        content_type=row.content_type,
+                        blueprint_label=row.blueprint_label,
+                        error_msg=error_msg
+                    )
+                except Exception as credit_err:
+                    logging.error(f"ไม่สามารถบันทึก Usage Log ล้มเหลวได้: {credit_err}")
 
         # เว้นวรรคการรันเพื่อเลี่ยงปัญหาความถี่ปัญญาประดิษฐ์และ API
         time.sleep(3)
