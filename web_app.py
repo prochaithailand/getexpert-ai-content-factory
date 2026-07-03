@@ -236,11 +236,216 @@ def show_user_history_section(user_email, key_suffix):
                     with st.expander("🔍 ดูรายละเอียดผลลัพธ์ Content Pack"):
                         show_history_row_details(row, key_prefix=f"{key_suffix}_{row.row_idx}_{idx}")
 
+def show_user_referral_partner_section(user_email, key_suffix):
+    """
+    แสดงส่วนแดชบอร์ด Referral Partner ของผู้ใช้นั้นๆ หากได้รับอนุมัติสิทธิ์แล้ว (Sprint 7)
+    """
+    user_obj = st.session_state.get(f"{key_suffix}_user_credit_obj")
+    if user_obj and user_obj.is_referral_partner:
+        st.write("")
+        with st.container(border=True):
+            st.markdown("### 🤝 แดชบอร์ดผู้แนะนำ (Referral Partner Dashboard)")
+            st.success(f"คุณเป็น Referral Partner สถานะ: **{user_obj.referral_status}**")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"**รหัสแนะนำของคุณ:** `{user_obj.referral_code}`")
+                st.markdown(f"**วันที่เข้าร่วม:** {user_obj.referral_started_at}")
+            with c2:
+                st.markdown(f"**ลิงก์แนะนำของคุณ:** `{user_obj.referral_link}`")
+                st.markdown(f"**ค่าสิทธิ์แนะนำ:** {user_obj.referral_package_paid} บาท")
+                
+            # แสดงประวัติการแนะนำที่ได้รับคอมมิชชั่น
+            if st.button("📊 โหลดข้อมูลคอมมิชชั่นแนะนำของฉัน", key=f"load_partner_comm_btn_{key_suffix}"):
+                with st.spinner("กำลังดึงข้อมูลคอมมิชชั่น..."):
+                    try:
+                        all_logs = sheets_service.service.service.spreadsheets().values().get(
+                            spreadsheetId=sheets_service.spreadsheet_id, range="Referral Logs!A:I").execute().get('values', [])
+                        
+                        partner_logs = []
+                        total_earned = 0.0
+                        if all_logs and len(all_logs) > 1:
+                            for row in all_logs[1:]:
+                                if len(row) > 1 and row[1].strip().upper() == user_obj.referral_code.strip().upper():
+                                    padded_row = row + [''] * (9 - len(row))
+                                    partner_logs.append(padded_row)
+                                    try:
+                                        total_earned += float(padded_row[6])
+                                    except ValueError:
+                                        pass
+                                        
+                        st.markdown(f"💰 **รายได้สะสมทั้งหมด (คอมมิชชั่นชั้นเดียว):** {total_earned} บาท")
+                        if partner_logs:
+                            import pandas as pd
+                            df = pd.DataFrame(partner_logs, columns=[
+                                "วันที่", "รหัสแนะนำ", "อีเมลผู้แนะนำ", "อีเมลผู้ใช้ใหม่", 
+                                "แพ็กเกจ", "ยอดเงินชำระ", "ค่าแนะนำที่ได้รับ", "สถานะ", "หมายเหตุ"
+                            ])
+                            st.dataframe(df)
+                        else:
+                            st.info("ยังไม่มีข้อมูลค่าคอมมิชชั่นจากผู้ที่สมัครผ่านลิงก์ของคุณ")
+                    except Exception as e:
+                        st.error(f"ไม่สามารถโหลดข้อมูลคอมมิชชั่นได้: {e}")
+
+def show_admin_referral_manager():
+    """
+    หน้าจอผู้ดูแลระบบสำหรับเปิดสิทธิ์ Referral Partner และบันทึกยอดเงิน/เครดิต (Sprint 7)
+    """
+    st.info("💡 ส่วนนี้สำหรับแอดมิน: ใช้สำหรับค้นหาผู้ใช้ เปิดสิทธิ์ Referral Partner และบันทึกยอดเติมเครดิตพร้อมคำนวณค่าคอมมิชชั่น")
+    
+    admin_search_email = st.text_input("ค้นหาอีเมลผู้ใช้งาน *", placeholder="user@example.com", key="admin_search_email").strip()
+    
+    if admin_search_email:
+        try:
+            result = sheets_service.get_user_by_email(admin_search_email)
+            if not result:
+                st.warning("⚠️ ไม่พบผู้ใช้งานรายนี้ในระบบ")
+            else:
+                user, row_idx = result
+                st.markdown(f"#### 👤 ข้อมูลผู้ใช้: {user.user_name} ({user.user_email})")
+                
+                # แสดงสถานะเดิม
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.write(f"💳 **สิทธิ์ทดลองใช้ฟรีที่ใช้ไป:** {user.free_credits_used} / 3")
+                with c2:
+                    st.write(f"💎 **เครดิตจ่ายเงินคงเหลือ:** {user.paid_credits_balance}")
+                with c3:
+                    st.write(f"🤝 **เป็น Referral Partner:** {'เป็นแล้ว ✅' if user.is_referral_partner else 'ยังไม่เป็น ❌'}")
+                    
+                st.write(f"🔗 **ผู้แนะนำ (Referred By):** `{user.referred_by if user.referred_by else 'ไม่มี'}`")
+                
+                st.write("---")
+                
+                # 1. การจัดการ Referral Partner
+                st.markdown("##### 🤝 จัดการสิทธิ์ Referral Partner")
+                if not user.is_referral_partner:
+                    st.write("ผู้ใช้รายนี้ยังไม่ได้เป็นพาร์ทเนอร์แนะนำสินค้า")
+                    
+                    # ให้กรอก Referral Code เอง หรือระบบสุ่มให้
+                    suggested_code = user.user_email.split('@')[0][:8].upper() + "001"
+                    ref_code_input = st.text_input("กำหนด Referral Code (ต้องไม่ซ้ำและห้ามใช้ Email ตรงๆ)", value=suggested_code).strip().upper()
+                    
+                    if st.button("🌟 เปิดสิทธิ์ Referral Partner", key="activate_partner_btn"):
+                        if not ref_code_input:
+                            st.error("กรุณาระบุ Referral Code")
+                        elif ref_code_input == user.user_email.upper():
+                            st.error("ห้ามใช้ Email ตรงๆ เป็น Referral Code")
+                        else:
+                            with st.spinner("กำลังตรวจสอบและเปิดสิทธิ์..."):
+                                # ตรวจสอบความซ้ำซ้อนของโค้ด
+                                existing_ref = sheets_service.get_user_by_referral_code(ref_code_input)
+                                if existing_ref:
+                                    st.error(f"⚠️ รหัสแนะนำ '{ref_code_input}' นี้ถูกใช้งานแล้วโดยผู้ใช้อื่น! กรุณาเปลี่ยนใหม่")
+                                else:
+                                    import datetime as dt
+                                    now_str = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    # อัปเดตข้อมูลผู้ใช้
+                                    user.is_referral_partner = True
+                                    user.referral_code = ref_code_input
+                                    # สร้าง Referral Link อ้างอิงตามโดเมน Streamlit Cloud
+                                    user.referral_link = f"https://getexpert-ai-content-factory1.streamlit.app/?ref={ref_code_input}"
+                                    user.referral_started_at = now_str
+                                    user.referral_package_paid = 149.0
+                                    user.referral_status = "Active"
+                                    user.updated_at = now_str
+                                    
+                                    sheets_service.save_user_credit(user, row_idx)
+                                    st.success(f"🎉 เปิดสิทธิ์ Referral Partner สำเร็จ! รหัสแนะนำ: {ref_code_input}")
+                                    st.rerun()
+                else:
+                    st.success(f"ผู้ใช้รายนี้เป็น Referral Partner แล้ว! รหัส: `{user.referral_code}`")
+                    st.write(f"🔗 **Referral Link:** `{user.referral_link}`")
+                    st.write(f"💰 **ยอดชำระค่าสิทธิ์:** {user.referral_package_paid} บาท")
+                    
+                    if st.button("🚫 ยกเลิกสิทธิ์ Referral Partner", key="deactivate_partner_btn"):
+                        with st.spinner("กำลังยกเลิกสิทธิ์..."):
+                            user.is_referral_partner = False
+                            user.referral_status = "Inactive"
+                            user.updated_at = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            sheets_service.save_user_credit(user, row_idx)
+                            st.success("ยกเลิกสิทธิ์พาร์ทเนอร์แนะนำสำเร็จ")
+                            st.rerun()
+                            
+                st.write("---")
+                
+                # 2. การบันทึกรับเงินเติมเครดิตและบันทึกค่าแนะนำ
+                st.markdown("##### 💳 บันทึกการเติมเครดิตและคำนวณค่าคอมมิชชั่น")
+                package_options = {
+                    "แพ็กเริ่มต้น 99 บาท (10 Credits)": {"price": 99.00, "credits": 10},
+                    "Referral Starter 149 บาท (10 Credits + สิทธิ์แนะนำ)": {"price": 149.00, "credits": 10}
+                }
+                selected_pkg_name = st.selectbox("เลือกแพ็กเกจที่เติม", options=list(package_options.keys()))
+                
+                if st.button("💾 บันทึกการเติมเครดิตและสลิป", key="record_payment_credits_btn"):
+                    with st.spinner("กำลังเติมเครดิตและบันทึกประวัติ..."):
+                        pkg_info = package_options[selected_pkg_name]
+                        price = pkg_info["price"]
+                        credits_to_add = pkg_info["credits"]
+                        
+                        import datetime as dt
+                        now_str = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        # 1. ปรับปรุงเครดิตผู้ใช้งาน
+                        user.paid_credits_balance += credits_to_add
+                        user.payment_status = "Active Customer"
+                        user.updated_at = now_str
+                        sheets_service.save_user_credit(user, row_idx)
+                        
+                        # 2. บันทึกใน Payments Sheet
+                        from models.credit_models import PaymentRecord
+                        payment = PaymentRecord(
+                            payment_date=now_str,
+                            user_email=user.user_email,
+                            package_name=selected_pkg_name,
+                            amount=price,
+                            credits_added=credits_to_add,
+                            payment_method="QR Code",
+                            slip_status="Approved",
+                            approved_by="Admin",
+                            approved_at=now_str,
+                            note="เติมเงินผ่านหน้าแอดมินพาร์ทเนอร์"
+                        )
+                        sheets_service.add_payment_record(payment)
+                        
+                        # 3. คำนวณคอมมิชชั่น 20 บาท หากผู้ใช้นี้มีผู้แนะนำ (Referred By)
+                        # จ่ายเฉพาะเมื่อลูกค้าชำระเงินแพ็กเกจปกติ (คอมมิชชั่นชั้นเดียว)
+                        commission_logged = ""
+                        if user.referred_by:
+                            referrer_result = sheets_service.get_user_by_referral_code(user.referred_by)
+                            if referrer_result:
+                                referrer_user, _ = referrer_result
+                                if referrer_user.is_referral_partner and referrer_user.referral_status == "Active":
+                                    # บันทึก Referral Log
+                                    commission_amount = 20.00
+                                    sheets_service.add_referral_log([
+                                        now_str,
+                                        referrer_user.referral_code,
+                                        referrer_user.user_email,
+                                        user.user_email,
+                                        selected_pkg_name,
+                                        price,
+                                        commission_amount,
+                                        "Pending Paid",
+                                        "ค่าแนะนำแนะนำเพื่อนสมัครใช้บริการ"
+                                    ])
+                                    commission_logged = f" พร้อมบันทึกคอมมิชชั่นแนะนำเพื่อน 20 บาท ให้กับรหัสพาร์ทเนอร์ {referrer_user.referral_code} ({referrer_user.user_email}) สำเร็จ!"
+                        
+                        st.success(f"เติมเครดิตสำเร็จ! เพิ่มยอด {credits_to_add} Credits ให้ผู้ใช้ {user.user_email}{commission_logged}")
+                        st.rerun()
+                        
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการโหลดข้อมูล: {e}")
+
 # โหลดข้อมูล Blueprint ทั้งหมด
 blueprints_data = BlueprintService.get_all_blueprints()
 
 # ตรวจสอบ URL Parameter ว่าเป็น Demo Mode หรือไม่ (?demo=true)
 is_demo = st.query_params.get("demo", "false").lower() == "true"
+
+# เก็บ referral code ใน session state เมื่อเข้ามาทาง URL ref parameter (Sprint 7)
+if "ref" in st.query_params:
+    st.session_state["referred_by_code"] = st.query_params["ref"].strip()
 
 if is_demo:
     # ----------------------------------------------------
@@ -306,7 +511,8 @@ if is_demo:
             with st.spinner("กำลังเชื่อมต่อระบบฐานข้อมูลเครดิต..."):
                 try:
                     credit_service = get_credit_service()
-                    credit_service.get_or_create_user(user_email, user_name)
+                    user = credit_service.get_or_create_user(user_email, user_name, referred_by=st.session_state.get("referred_by_code", ""))
+                    st.session_state['demo_user_credit_obj'] = user
                     eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
                     
                     st.session_state['demo_is_eligible'] = eligible
@@ -336,6 +542,8 @@ if is_demo:
             
             # แสดงส่วนประวัติการสร้างคอนเทนต์ของฉัน (Sprint 6.1)
             show_user_history_section(user_email, "demo")
+            # แสดงส่วนแดชบอร์ด Referral Partner ของฉัน (Sprint 7)
+            show_user_referral_partner_section(user_email, "demo")
         else:
             st.warning("⚠️ มีการกรอกอีเมลใหม่ กรุณากดปุ่มเพื่อเริ่มตรวจสอบสิทธิ์")
     else:
@@ -728,7 +936,8 @@ else:
             with st.spinner("กำลังเชื่อมต่อระบบฐานข้อมูลเครดิต..."):
                 try:
                     credit_service = get_credit_service()
-                    credit_service.get_or_create_user(user_email, user_name)
+                    user = credit_service.get_or_create_user(user_email, user_name, referred_by=st.session_state.get("referred_by_code", ""))
+                    st.session_state['std_user_credit_obj'] = user
                     eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
                     
                     st.session_state['std_is_eligible'] = eligible
@@ -758,6 +967,8 @@ else:
             
             # แสดงส่วนประวัติการสร้างคอนเทนต์ของฉัน (Sprint 6.1)
             show_user_history_section(user_email, "std")
+            # แสดงส่วนแดชบอร์ด Referral Partner ของฉัน (Sprint 7)
+            show_user_referral_partner_section(user_email, "std")
         else:
             st.warning("⚠️ มีการกรอกอีเมลใหม่ กรุณากดปุ่มเพื่อเริ่มตรวจสอบสิทธิ์")
     else:
@@ -1062,3 +1273,7 @@ else:
                 st.info("ไม่มีรายการข้อมูลประวัติการทำงานในแผ่นชีต")
         except Exception as e:
             st.error(f"ไม่สามารถโหลดสรุปข้อมูลตารางคิวงานได้ชั่วคราว: {e}")
+
+    # ระบบจัดการ Referral Partner สำหรับแอดมิน (Sprint 7)
+    st.markdown("---")
+    show_admin_referral_manager()

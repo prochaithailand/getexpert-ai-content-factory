@@ -16,6 +16,14 @@ class UserCredit(BaseModel):
     payment_status: str = Field(default="Free Trial", description="สถานะโหมดชำระเงินของผู้ใช้ (เช่น Free Trial, Active Customer)")
     last_generated_at: str = Field(default="", description="เวลาประมวลผลงานชิ้นล่าสุด")
     updated_at: str = Field(description="เวลาปรับปรุงสถานะผู้ใช้งานล่าสุด")
+    # Sprint 7 Referral Fields
+    is_referral_partner: bool = Field(default=False, description="ผู้ใช้เป็น Referral Partner หรือไม่")
+    referral_code: str = Field(default="", description="รหัส Referral (เช่น KALAYA001)")
+    referral_link: str = Field(default="", description="ลิงก์ Referral แนะนำผู้ใช้อื่น")
+    referral_started_at: str = Field(default="", description="วันที่เริ่มเป็นพาร์ทเนอร์แนะนำ")
+    referral_package_paid: float = Field(default=0.0, description="จำนวนเงินที่จ่ายค่าแพ็กแนะนำ (เช่น 149)")
+    referral_status: str = Field(default="", description="สถานะการแนะนำ (Active / Inactive)")
+    referred_by: str = Field(default="", description="รหัสแนะนำที่เป็นผู้ส่งผู้ใช้นี้มา (Referrer Code)")
 
 class UsageLog(BaseModel):
     """

@@ -17,9 +17,9 @@ class CreditService:
             logging.error(f"ไม่สามารถเริ่มใช้งาน SheetsService ใน CreditService ได้: {e}")
             self.sheets_service = None
 
-    def get_or_create_user(self, email: str, name: str) -> UserCredit:
+    def get_or_create_user(self, email: str, name: str, referred_by: str = "") -> UserCredit:
         """
-        ดึงข้อมูลผู้ใช้ปัจจุบันจากอีเมล หรือสร้างใหม่หากไม่พบประวัติการใช้งาน
+        ดึงข้อมูลผู้ใช้ปัจจุบันจากอีเมล หรือสร้างใหม่หากไม่พบประวัติการใช้งาน (พร้อมรองรับรหัสผู้แนะนำ Referred By)
         """
         email_clean = email.strip().lower()
         name_clean = name.strip() if name else "Anonymous User"
@@ -36,7 +36,8 @@ class CreditService:
                 total_generated=0,
                 payment_status="Free Trial",
                 last_generated_at="",
-                updated_at=now_str
+                updated_at=now_str,
+                referred_by=referred_by
             )
             
         try:
@@ -63,10 +64,11 @@ class CreditService:
                 total_generated=0,
                 payment_status="Free Trial",
                 last_generated_at="",
-                updated_at=now_str
+                updated_at=now_str,
+                referred_by=referred_by
             )
             
-        # สร้างผู้ใช้ใหม่พิกัดเริ่มต้น
+        # สร้างผู้ใช้ใหม่พิกัดเริ่มต้น พร้อมระบุผู้แนะนำถ้ามี
         new_user = UserCredit(
             user_email=email_clean,
             user_name=name_clean,
@@ -76,7 +78,8 @@ class CreditService:
             total_generated=0,
             payment_status="Free Trial",
             last_generated_at="",
-            updated_at=now_str
+            updated_at=now_str,
+            referred_by=referred_by
         )
         try:
             self.sheets_service.save_user_credit(new_user)

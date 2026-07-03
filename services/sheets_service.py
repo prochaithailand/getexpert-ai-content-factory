@@ -534,12 +534,14 @@ class SheetsService:
         self.ensure_worksheet_exists("Users", [
             "User Email", "User Name", "Created At", "Free Credits Used", 
             "Paid Credits Balance", "Total Generated", "Payment Status", 
-            "Last Generated At", "Updated At"
+            "Last Generated At", "Updated At", "Is Referral Partner",
+            "Referral Code", "Referral Link", "Referral Started At",
+            "Referral Package Paid", "Referral Status", "Referred By"
         ])
         
         try:
             result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id, range="Users!A:I").execute()
+                spreadsheetId=self.spreadsheet_id, range="Users!A:P").execute()
             values = result.get('values', [])
             
             if not values or len(values) <= 1:
@@ -548,8 +550,16 @@ class SheetsService:
             email_lower = email.strip().lower()
             for idx, row in enumerate(values[1:], start=2):
                 if row and row[0].strip().lower() == email_lower:
-                    padded = row + [''] * (9 - len(row))
+                    padded = row + [''] * (16 - len(row))
                     from models.credit_models import UserCredit
+                    
+                    is_ref = padded[9].strip().lower() == "true"
+                    ref_pkg_paid = 0.0
+                    try:
+                        ref_pkg_paid = float(padded[13]) if padded[13] else 0.0
+                    except ValueError:
+                        pass
+                        
                     return UserCredit(
                         user_email=padded[0],
                         user_name=padded[1],
@@ -559,7 +569,14 @@ class SheetsService:
                         total_generated=int(padded[5]) if padded[5].isdigit() else 0,
                         payment_status=padded[6] if padded[6] else "Free Trial",
                         last_generated_at=padded[7],
-                        updated_at=padded[8]
+                        updated_at=padded[8],
+                        is_referral_partner=is_ref,
+                        referral_code=padded[10],
+                        referral_link=padded[11],
+                        referral_started_at=padded[12],
+                        referral_package_paid=ref_pkg_paid,
+                        referral_status=padded[14],
+                        referred_by=padded[15]
                     ), idx
             return None
         except Exception as e:
@@ -574,7 +591,9 @@ class SheetsService:
         headers = [
             "User Email", "User Name", "Created At", "Free Credits Used", 
             "Paid Credits Balance", "Total Generated", "Payment Status", 
-            "Last Generated At", "Updated At"
+            "Last Generated At", "Updated At", "Is Referral Partner",
+            "Referral Code", "Referral Link", "Referral Started At",
+            "Referral Package Paid", "Referral Status", "Referred By"
         ]
         self.ensure_worksheet_exists("Users", headers)
         
@@ -587,20 +606,27 @@ class SheetsService:
             str(user.total_generated),
             user.payment_status,
             user.last_generated_at,
-            user.updated_at
+            user.updated_at,
+            "TRUE" if user.is_referral_partner else "FALSE",
+            user.referral_code,
+            user.referral_link,
+            user.referral_started_at,
+            str(user.referral_package_paid),
+            user.referral_status,
+            user.referred_by
         ]
         
         try:
             if row_idx:
                 # ทำการอัปเดตแถวเดิมที่มีอยู่แล้ว
-                write_range = f"Users!A{row_idx}:I{row_idx}"
+                write_range = f"Users!A{row_idx}:P{row_idx}"
             else:
                 # หาแถวใหม่โดยดูจำนวนแถวปัจจุบัน
                 result = self.service.spreadsheets().values().get(
                     spreadsheetId=self.spreadsheet_id, range="Users!A:A").execute()
                 values = result.get('values', [])
                 new_row = len(values) + 1 if values else 2
-                write_range = f"Users!A{new_row}:I{new_row}"
+                write_range = f"Users!A{new_row}:P{new_row}"
                 
             self.service.spreadsheets().values().update(
                 spreadsheetId=self.spreadsheet_id,
@@ -696,4 +722,91 @@ class SheetsService:
             logging.info(f"บันทึกรายการชำระเงินสำหรับ {payment.user_email} สำเร็จ")
         except Exception as e:
             logging.error(f"ไม่สามารถบันทึก Payment Record ลงชีตได้: {e}")
+            raise e
+
+    @retry(max_retries=1, delays=[1])
+    def get_user_by_referral_code(self, ref_code: str):
+        """
+        ค้นหาข้อมูลผู้ใช้งานจากรหัสแนะนำ (Referral Code) ในชีต Users คืนค่าเป็นโมเดล UserCredit หรือ None
+        """
+        self.ensure_worksheet_exists("Users", [
+            "User Email", "User Name", "Created At", "Free Credits Used", 
+            "Paid Credits Balance", "Total Generated", "Payment Status", 
+            "Last Generated At", "Updated At", "Is Referral Partner",
+            "Referral Code", "Referral Link", "Referral Started At",
+            "Referral Package Paid", "Referral Status", "Referred By"
+        ])
+        
+        try:
+            result = self.service.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id, range="Users!A:P").execute()
+            values = result.get('values', [])
+            
+            if not values or len(values) <= 1:
+                return None
+                
+            code_clean = ref_code.strip().upper()
+            for idx, row in enumerate(values[1:], start=2):
+                if len(row) > 10 and row[10].strip().upper() == code_clean:
+                    padded = row + [''] * (16 - len(row))
+                    from models.credit_models import UserCredit
+                    
+                    is_ref = padded[9].strip().lower() == "true"
+                    ref_pkg_paid = 0.0
+                    try:
+                        ref_pkg_paid = float(padded[13]) if padded[13] else 0.0
+                    except ValueError:
+                        pass
+                        
+                    return UserCredit(
+                        user_email=padded[0],
+                        user_name=padded[1],
+                        created_at=padded[2],
+                        free_credits_used=int(padded[3]) if padded[3].isdigit() else 0,
+                        paid_credits_balance=int(padded[4]) if padded[4].isdigit() else 0,
+                        total_generated=int(padded[5]) if padded[5].isdigit() else 0,
+                        payment_status=padded[6] if padded[6] else "Free Trial",
+                        last_generated_at=padded[7],
+                        updated_at=padded[8],
+                        is_referral_partner=is_ref,
+                        referral_code=padded[10],
+                        referral_link=padded[11],
+                        referral_started_at=padded[12],
+                        referral_package_paid=ref_pkg_paid,
+                        referral_status=padded[14],
+                        referred_by=padded[15]
+                    ), idx
+            return None
+        except Exception as e:
+            logging.error(f"เกิดข้อผิดพลาดในการค้นหาผู้ใช้ตามรหัสแนะนำ: {e}")
+            raise e
+
+    @retry(max_retries=1, delays=[1])
+    def add_referral_log(self, log_data: list):
+        """
+        บันทึกรายการคำขอบคุณและคอมมิชชั่นแนะนำลงในชีต Referral Logs
+        log_data: [Timestamp, Referrer Code, Referrer Email, Referred User Email, Package Name, Payment Amount, Commission Amount, Status, Note]
+        """
+        headers = [
+            "Timestamp", "Referrer Code", "Referrer Email", "Referred User Email", 
+            "Package Name", "Payment Amount", "Commission Amount", "Status", "Note"
+        ]
+        self.ensure_worksheet_exists("Referral Logs", headers)
+        
+        try:
+            result = self.service.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id, range="Referral Logs!A:A").execute()
+            values = result.get('values', [])
+            new_row = len(values) + 1 if values else 2
+            
+            write_range = f"Referral Logs!A{new_row}:I{new_row}"
+            self.service.service.spreadsheets().values().update(
+                spreadsheetId=self.spreadsheet_id,
+                range=write_range,
+                valueInputOption="RAW",
+                body={"values": [[str(x) for x in log_data]]}
+            ).execute()
+            logging.info(f"บันทึก Referral Log สำหรับผู้แนะนำ {log_data[1]} สำเร็จ")
+        except Exception as e:
+            logging.error(f"ไม่สามารถบันทึก Referral Log ลงชีตได้: {e}")
             raise e
