@@ -440,12 +440,63 @@ def show_admin_referral_manager():
 # โหลดข้อมูล Blueprint ทั้งหมด
 blueprints_data = BlueprintService.get_all_blueprints()
 
-# ตรวจสอบ URL Parameter ว่าเป็น Demo Mode หรือไม่ (?demo=true)
-is_demo = st.query_params.get("demo", "false").lower() == "true"
+# ----------------------------------------------------
+# Safe Query Parameter Capture (Sprint 7.1)
+# ----------------------------------------------------
+ENABLE_REFERRAL_QUERY_CAPTURE = True
 
-# เก็บ referral code ใน session state เมื่อเข้ามาทาง URL ref parameter (Sprint 7)
-if "ref" in st.query_params:
-    st.session_state["referred_by_code"] = st.query_params["ref"].strip()
+def sanitize_referral_code(code: str) -> str:
+    """
+    ทำความสะอาดรหัสแนะนำให้รับเฉพาะ A-Z, 0-9, _, - และมีความยาวไม่เกิน 20 ตัวอักษร
+    """
+    if not code:
+        return ""
+    import re
+    cleaned = re.sub(r'[^A-Za-z0-9_\-]', '', code)
+    return cleaned[:20].upper()
+
+is_demo = False
+try:
+    # ดึงค่า demo mode อย่างปลอดภัย
+    query_params_demo = getattr(st, "query_params", {})
+    raw_demo = "false"
+    if query_params_demo:
+        if hasattr(query_params_demo, "get"):
+            raw_demo = query_params_demo.get("demo", "false")
+        elif isinstance(query_params_demo, dict):
+            raw_demo = query_params_demo.get("demo", "false")
+            
+    if isinstance(raw_demo, list):
+        raw_demo = raw_demo[0] if raw_demo else "false"
+    elif not isinstance(raw_demo, str):
+        raw_demo = str(raw_demo) if raw_demo is not None else "false"
+        
+    is_demo = raw_demo.lower() == "true"
+except BaseException as e:
+    import logging
+    logging.warning(f"ล้มเหลวในการตรวจสอบโหมดทดสอบ (demo mode query param): {e}")
+
+if ENABLE_REFERRAL_QUERY_CAPTURE:
+    try:
+        query_params_ref = getattr(st, "query_params", {})
+        if query_params_ref:
+            raw_ref = ""
+            if hasattr(query_params_ref, "get"):
+                raw_ref = query_params_ref.get("ref", "")
+            elif isinstance(query_params_ref, dict):
+                raw_ref = query_params_ref.get("ref", "")
+                
+            if isinstance(raw_ref, list):
+                raw_ref = raw_ref[0] if raw_ref else ""
+            elif not isinstance(raw_ref, str):
+                raw_ref = str(raw_ref) if raw_ref is not None else ""
+                
+            referral_code = sanitize_referral_code(raw_ref)
+            if referral_code:
+                st.session_state["referred_by_code"] = referral_code
+    except BaseException as e:
+        import logging
+        logging.warning(f"Referral query capture disabled due to error: {e}", exc_info=True)
 
 if is_demo:
     # ----------------------------------------------------
@@ -453,6 +504,8 @@ if is_demo:
     # ----------------------------------------------------
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
     st.info("🎁 ทดลองใช้ฟรี 3 Content Packs / หลังจากนั้นเริ่มต้นเพียง 99 บาท ได้ 10 Content Credits (1 Credit = สร้างครบชุด 1 ครั้ง)")
+    if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
+        st.caption(f"👋 คุณเข้าใช้งานผ่านลิงก์ผู้แนะนำ: **{st.session_state['referred_by_code']}**")
 
     # Hero Section
     st.markdown("""
@@ -900,6 +953,8 @@ else:
     # ----------------------------------------------------
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
     st.info("🎁 ทดลองใช้ฟรี 3 Content Packs / หลังจากนั้นเริ่มต้นเพียง 99 บาท ได้ 10 Content Credits (1 Credit = สร้างครบชุด 1 ครั้ง)")
+    if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
+        st.caption(f"👋 คุณเข้าใช้งานผ่านลิงก์ผู้แนะนำ: **{st.session_state['referred_by_code']}**")
 
     st.title("🚀 GetExpert AI Content Factory Portal")
     st.markdown("ระบบผลิตชุดโซเชียลคอนเทนต์ครบวงจร (Sprint 5: Client Delivery & AI Content Blueprint Strategy)")

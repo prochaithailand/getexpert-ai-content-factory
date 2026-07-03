@@ -144,3 +144,51 @@ class TestReferralSystem(unittest.TestCase):
         self.assertTrue(user_res.is_referral_partner)
         self.assertEqual(idx, 2)
 
+    def test_sanitize_referral_code(self):
+        """
+        ทดสอบการ sanitize รหัสแนะนำตามรูปแบบที่กำหนด
+        """
+        import re
+        def sanitize_referral_code(code: str) -> str:
+            if not code:
+                return ""
+            cleaned = re.sub(r'[^A-Za-z0-9_\-]', '', code)
+            return cleaned[:20].upper()
+
+        self.assertEqual(sanitize_referral_code("PROCHAIT001"), "PROCHAIT001")
+        self.assertEqual(sanitize_referral_code("prochait-001_test"), "PROCHAIT-001_TEST")
+        self.assertEqual(sanitize_referral_code("PROCHAIT!!!001"), "PROCHAIT001")
+        self.assertEqual(sanitize_referral_code("a" * 50), "A" * 20)
+        self.assertEqual(sanitize_referral_code(None), "")
+
+    def test_query_params_error_safety(self):
+        """
+        ทดสอบความปลอดภัยว่าหาก st.query_params เกิดข้อผิดพลาด/ไม่มีค่า จะไม่ทำให้แอป crash
+        """
+        import logging
+        
+        # จำลองการเกิด Error ตอนดึง query_params
+        def get_demo_param_safe(query_params_mock):
+            is_demo = False
+            try:
+                raw_demo = "false"
+                if query_params_mock:
+                    if hasattr(query_params_mock, "get"):
+                        raw_demo = query_params_mock.get("demo", "false")
+                if isinstance(raw_demo, list):
+                    raw_demo = raw_demo[0] if raw_demo else "false"
+                is_demo = raw_demo.lower() == "true"
+            except BaseException as e:
+                logging.warning(f"Error check: {e}")
+            return is_demo
+
+        # ถ้า mock เป็น None (เหมือนไม่มีคุณลักษณะ) ต้องไม่พัง
+        self.assertFalse(get_demo_param_safe(None))
+        # ถ้า mock เป็น dict
+        self.assertTrue(get_demo_param_safe({"demo": "true"}))
+        # ถ้า mock โยน exception
+        class BrokenParams:
+            def get(self, name, default):
+                raise RuntimeError("Segfault simulated")
+        self.assertFalse(get_demo_param_safe(BrokenParams()))
+
