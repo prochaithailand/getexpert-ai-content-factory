@@ -72,6 +72,44 @@ def get_credit_service():
     from services.credit_service import CreditService
     return CreditService(sheets_service)
 
+def show_payment_gate():
+    """
+    แสดงหน้าจอ Payment Gate เมื่อผู้ใช้งานใช้สิทธิ์เครดิตหมด (Sprint 6)
+    """
+    st.markdown("""
+    ### 💳 คุณใช้สิทธิ์ทดลองใช้ฟรีครบ 3 Content Packs แล้ว
+    
+    หากต้องการสร้างคอนเทนต์ต่อ
+    ซื้อเครดิตเริ่มต้นเพียง **99 บาท**
+    รับ **10 Content Credits**
+    
+    *(1 Credit = สร้าง Content Pack ครบชุด 1 ครั้ง)*
+    
+    ---
+    
+    #### 📦 แพ็กเกจที่ให้บริการ:
+    - **แพ็กเริ่มต้น 99 บาท** = รับ 10 Content Credits
+    """)
+    
+    from pathlib import Path
+    qr_path = Path("assets/payment_qr.png")
+    if qr_path.exists():
+        st.image(str(qr_path), caption="สแกนเพื่อชำระเงิน 99 บาท", use_container_width=True)
+    else:
+        st.warning("⚠️ กรุณาเพิ่มไฟล์ QR Code ที่ assets/payment_qr.png")
+        
+    st.markdown("""
+    #### 📌 วิธีชำระเงิน:
+    1. สแกน QR Code ด้านบนเพื่อชำระเงิน
+    2. หลังโอนเงินแล้ว กรุณาส่งสลิปมาที่ LINE OA: **@774dfect** (หรือกดลิงก์ [https://lin.ee/774dfect](https://lin.ee/774dfect))
+    3. แจ้ง Email ที่ใช้ในระบบ
+    4. Admin จะตรวจสอบและเติมเครดิตให้ภายในระบบ
+    
+    ---
+    
+    📢 **หลังชำระเงิน กรุณาส่งสลิปที่ LINE OA: [@774dfect](https://lin.ee/774dfect) พร้อมแจ้ง Email ที่ใช้ในระบบ เพื่อให้ Admin เติมเครดิตให้ถูกบัญชี**
+    """)
+
 # โหลดข้อมูล Blueprint ทั้งหมด
 blueprints_data = BlueprintService.get_all_blueprints()
 
@@ -196,24 +234,7 @@ if is_demo:
         elif not is_eligible:
             # แสดงหน้าจอ Payment Gate แทนตัวฟอร์ม (Sprint 6)
             with st.container(border=True):
-                st.markdown("""
-                ### 💳 คุณใช้สิทธิ์ทดลองใช้ฟรีครบ 3 Content Packs แล้ว
-                
-                หากต้องการสร้างคอนเทนต์ต่อ ซื้อเครดิตเริ่มต้นเพียง **99 บาท** รับ **10 Content Credits**
-                
-                *(1 Credit = สร้าง Content Pack ครบชุด 1 ครั้ง)*
-                
-                ---
-                
-                #### 📌 ช่องทางการชำระเงิน (Manual Payment)
-                1. **สแกน QR Code หรือโอนเข้าบัญชี:**
-                   - ธนาคารกสิกรไทย: 012-3-45678-9 (บริษัท เก็ทเอ็กซ์เพิร์ท จำกัด)
-                2. **ส่งสลิปหลักฐานการชำระเงิน:**
-                   - แอด LINE OA: **@GetExpert**
-                   - ส่งรูปสลิปให้แอดมินเพื่อเติมเครดิต
-                
-                *แอดมินจะทำการเติมเครดิตให้คุณทันทีหลังตรวจสอบหลักฐานเรียบร้อยแล้ว*
-                """)
+                show_payment_gate()
         else:
             with st.container(border=True):
                 st.subheader("💡 ป้อนรายละเอียดตามบลูปริ้นต์")
@@ -631,24 +652,7 @@ else:
         elif not is_eligible:
             # แสดงหน้าจอ Payment Gate แทนตัวฟอร์ม (Sprint 6)
             with st.container(border=True):
-                st.markdown("""
-                ### 💳 คุณใช้สิทธิ์ทดลองใช้ฟรีครบ 3 Content Packs แล้ว
-                
-                หากต้องการสร้างคอนเทนต์ต่อ ซื้อเครดิตเริ่มต้นเพียง **99 บาท** รับ **10 Content Credits**
-                
-                *(1 Credit = สร้าง Content Pack ครบชุด 1 ครั้ง)*
-                
-                ---
-                
-                #### 📌 ช่องทางการชำระเงิน (Manual Payment)
-                1. **สแกน QR Code หรือโอนเข้าบัญชี:**
-                   - ธนาคารกสิกรไทย: 012-3-45678-9 (บริษัท เก็ทเอ็กซ์เพิร์ท จำกัด)
-                2. **ส่งสลิปหลักฐานการชำระเงิน:**
-                   - แอด LINE OA: **@GetExpert**
-                   - ส่งรูปสลิปให้แอดมินเพื่อเติมเครดิต
-                
-                *แอดมินจะทำการเติมเครดิตให้คุณทันทีหลังตรวจสอบหลักฐานเรียบร้อยแล้ว*
-                """)
+                show_payment_gate()
         else:
             with st.container(border=True):
                 st.subheader("📝 ป้อนรายละเอียดตามบลูปริ้นต์")
