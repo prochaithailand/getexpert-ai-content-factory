@@ -110,6 +110,132 @@ def show_payment_gate():
     📢 **หลังชำระเงิน กรุณาส่งสลิปที่ LINE OA: [@774dfect](https://lin.ee/774dfect) พร้อมแจ้ง Email ที่ใช้ในระบบ เพื่อให้ Admin เติมเครดิตให้ถูกบัญชี**
     """)
 
+def show_history_row_details(row_data, key_prefix=""):
+    """
+    แสดงรายละเอียดผลลัพธ์ของ SheetRow ย้อนหลัง (ใช้ใน Card UI ของ My Content History - Sprint 6.1)
+    """
+    status_lower = row_data.status.strip().lower()
+    
+    if status_lower == "drafted":
+        row_content_type = getattr(row_data, 'content_type', 'business')
+        row_blueprint = BlueprintService.get_blueprint(row_content_type)
+        row_outputs = row_blueprint.get("outputs", {})
+        
+        st.info(f"📂 AI Content Blueprint ที่ใช้: **{row_blueprint.get('label', 'ธุรกิจ')}**\n\nบทบาท: *{row_blueprint.get('prompt_strategy', {}).get('role', '')}*")
+        
+        tab_labels = [
+            row_outputs.get("seo_article", "📰 Blogger & SEO"),
+            row_outputs.get("facebook_post", "📘 Facebook Post"),
+            row_outputs.get("tiktok_script", "🎵 TikTok Script"),
+            row_outputs.get("youtube_script", "🔴 YouTube Shorts"),
+            row_outputs.get("image_prompt", "🎨 Image Prompts")
+        ]
+        
+        tab_blogger, tab_facebook, tab_tiktok, tab_youtube, tab_image = st.tabs(tab_labels, key=f"tabs_{key_prefix}")
+        
+        with tab_blogger:
+            st.markdown(f"🔗 **Blogger Draft URL:** [คลิกเปิดร่างบทความใน Blogger]({row_data.blogger_url})")
+            st.write(f"**Blogger Post ID:** `{row_data.blogger_post_id}`")
+            st.write(f"**SEO Title:** {strip_html_tags(row_data.seo_title)}")
+            st.write(f"**Meta Description:** {strip_html_tags(row_data.meta_description)}")
+            st.write(f"**Slug Recommendation:** `{strip_html_tags(row_data.slug_suggestion)}`")
+            st.write(f"**Focus Keyword:** {strip_html_tags(row_data.focus_keyword)}")
+            st.write(f"**Related Keywords:** {strip_html_tags(row_data.related_keywords)}")
+            st.markdown("**บทความฉบับเต็ม / ข้อมูลสรุป:**")
+            st.code(strip_html_tags(row_data.content_summary), language=None)
+            
+        with tab_facebook:
+            st.markdown(f"**โพสต์แนะนำประชาสัมพันธ์ ({row_outputs.get('facebook_post', 'Social Post')}):**")
+            st.code(strip_html_tags(row_data.facebook_post), language=None)
+            st.write(f"**แนะนำแฮชแท็ก:** {strip_html_tags(row_data.facebook_hashtags)}")
+            
+        with tab_tiktok:
+            st.markdown(f"🔥 **TikTok Hook (3 วินาทีแรก):** *\"{strip_html_tags(row_data.tiktok_hook)}\"*")
+            st.markdown(f"**{row_outputs.get('tiktok_script', 'สคริปต์สั้นบทพูดและแนวภาพ TikTok')}:**")
+            st.code(strip_html_tags(row_data.tiktok_script), language=None)
+            
+        with tab_youtube:
+            st.write(f"🎥 **{row_outputs.get('youtube_script', 'YouTube Shorts Title')}:** {strip_html_tags(row_data.youtube_title)}")
+            st.write(f"**คำอธิบายสรุปข่าว:** {strip_html_tags(row_data.youtube_description)}")
+            st.markdown(f"**{row_outputs.get('youtube_script', 'สคริปต์วิดีโอ YouTube Shorts')}:**")
+            st.code(strip_html_tags(row_data.youtube_shorts_script), language=None)
+            
+        with tab_image:
+            st.markdown(f"**{row_outputs.get('image_prompt', 'Featured Image Prompt')}:**")
+            st.code(strip_html_tags(row_data.featured_image_prompt), language=None)
+            st.write(f"**Image Style:** {strip_html_tags(row_data.image_style)}")
+            st.write(f"**Image Concept:** {strip_html_tags(row_data.image_concept)}")
+            
+    elif status_lower == "failed":
+        st.error(f"❌ การทำงานขัดข้องหลังพยายาม Retry ครบกำหนด: {row_data.last_error}")
+    else:
+        st.warning("⏳ รอประมวลผล (กรุณากรอกและสั่งรัน Engine main.py หลังบ้านเพื่อรับบทความ)")
+
+def show_user_history_section(user_email, key_suffix):
+    """
+    แสดงส่วนประวัติคอนเทนต์ส่วนตัวของผู้ใช้งาน (Sprint 6.1)
+    """
+    show_history_key = f"show_history_{key_suffix}"
+    history_rows_key = f"history_rows_{key_suffix}"
+    
+    if show_history_key not in st.session_state:
+        st.session_state[show_history_key] = False
+    if history_rows_key not in st.session_state:
+        st.session_state[history_rows_key] = []
+        
+    st.write("")
+    
+    col_hist_btn1, col_hist_btn2 = st.columns([1.5, 3])
+    with col_hist_btn1:
+        if st.button("📚 ดูคอนเทนต์ที่เคยสร้าง", key=f"load_history_btn_{key_suffix}"):
+            with st.spinner("กำลังดึงประวัติคอนเทนต์จากฐานข้อมูล..."):
+                try:
+                    all_rows = sheets_service.read_all_rows()
+                    user_rows = [r for r in all_rows if r.user_email.strip().lower() == user_email.strip().lower()]
+                    st.session_state[history_rows_key] = user_rows
+                    st.session_state[show_history_key] = True
+                    st.success("โหลดประวัติเสร็จสิ้น!")
+                except Exception as e:
+                    st.error(f"ไม่สามารถโหลดประวัติได้ชั่วคราว: {e}")
+                    
+    with col_hist_btn2:
+        if st.session_state[show_history_key]:
+            if st.button("❌ ซ่อนประวัติคอนเทนต์", key=f"hide_history_btn_{key_suffix}"):
+                st.session_state[show_history_key] = False
+                st.rerun()
+                
+    if st.session_state[show_history_key]:
+        user_rows = st.session_state[history_rows_key]
+        st.markdown("### 📚 ประวัติคอนเทนต์ที่เคยสร้าง")
+        
+        if not user_rows:
+            st.info("ยังไม่มีคอนเทนต์ที่เคยสร้างด้วย Email นี้")
+        else:
+            st.info("💡 สามารถกดปุ่มคัดลอก (Copy) ที่มุมบนขวาของกล่องข้อความผลลัพธ์ในรายละเอียดได้ทันที")
+            for idx, row in enumerate(reversed(user_rows)):
+                with st.container(border=True):
+                    st.markdown(f"#### 📝 หัวข้อ: {row.topic}")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.write(f"📅 **วันที่สร้าง:** {row.processed_at if row.processed_at else (row.created_at if row.created_at else 'ไม่ระบุ')}")
+                    with c2:
+                        st.write(f"📂 **บลูปริ้นต์:** {row.blueprint_label if row.blueprint_label else row.content_type}")
+                    with c3:
+                        status_lower = row.status.strip().lower()
+                        if status_lower == "drafted":
+                            st.markdown("สถานะ: <span class='status-badge status-drafted'>สร้างสำเร็จ</span>", unsafe_allow_html=True)
+                        elif status_lower == "processing":
+                            st.markdown("สถานะ: <span class='status-badge status-processing'>กำลังแต่งเนื้อหา...</span>", unsafe_allow_html=True)
+                        elif status_lower == "failed":
+                            st.markdown("สถานะ: <span class='status-badge status-failed'>เกิดข้อผิดพลาด</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown("สถานะ: <span class='status-badge status-waiting'>รอคิวรัน</span>", unsafe_allow_html=True)
+                            
+                    # ปุ่มแสดงรายละเอียด
+                    with st.expander("🔍 ดูรายละเอียดผลลัพธ์ Content Pack"):
+                        show_history_row_details(row, key_prefix=f"{key_suffix}_{row.row_idx}_{idx}")
+
 # โหลดข้อมูล Blueprint ทั้งหมด
 blueprints_data = BlueprintService.get_all_blueprints()
 
@@ -207,6 +333,9 @@ if is_demo:
                 st.success(f"💎 {status_msg} (คุณเหลือเครดิต {credit_balance} Content Packs)")
             elif credit_type == "blocked":
                 st.error(f"⚠️ {status_msg}")
+            
+            # แสดงส่วนประวัติการสร้างคอนเทนต์ของฉัน (Sprint 6.1)
+            show_user_history_section(user_email, "demo")
         else:
             st.warning("⚠️ มีการกรอกอีเมลใหม่ กรุณากดปุ่มเพื่อเริ่มตรวจสอบสิทธิ์")
     else:
@@ -626,6 +755,9 @@ else:
                 st.success(f"💎 {status_msg} (คุณเหลือเครดิต {credit_balance} Content Packs)")
             elif credit_type == "blocked":
                 st.error(f"⚠️ {status_msg}")
+            
+            # แสดงส่วนประวัติการสร้างคอนเทนต์ของฉัน (Sprint 6.1)
+            show_user_history_section(user_email, "std")
         else:
             st.warning("⚠️ มีการกรอกอีเมลใหม่ กรุณากดปุ่มเพื่อเริ่มตรวจสอบสิทธิ์")
     else:
