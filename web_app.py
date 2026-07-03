@@ -803,40 +803,52 @@ else:
 
     # แดชบอร์ดสรุปตารางคิวงานทั้งหมด
     st.subheader("📋 ตารางประมวลผลคิวงานผลิต Content Pack ทั้งหมด")
+    st.info("💡 สามารถตรวจสอบประวัติคิวงานสะสมได้โดยการกดปุ่มแสดงตารางด้านล่าง")
 
-    if st.button("🔄 โหลดรีเฟรชตารางข้อมูล"):
-        st.rerun()
+    if 'show_history_table' not in st.session_state:
+        st.session_state['show_history_table'] = False
 
-    try:
-        all_rows = sheets_service.read_all_rows()
-        if all_rows:
-            # แปลงข้อมูลวัตถุ Pydantic เข้าสู่รูปแบบตารางเพื่อแสดงผลใน Streamlit
-            table_data = []
-            for row in reversed(all_rows): # กลับลำดับเพื่อให้แถวใหม่สุดอยู่บนสุด
-                # ค้นหาป้ายประเภทบลูปริ้นต์
-                row_type = getattr(row, 'content_type', 'business')
-                bp_info = blueprints_data.get(row_type, blueprints_data["business"])
-                
-                table_data.append({
-                    "ID": row.id,
-                    "ประเภทคอนเทนต์": bp_info["label"],
-                    "Topic": row.topic,
-                    "Keyword": row.keyword,
-                    "Status": row.status,
-                    "SEO Title": row.seo_title,
-                    "Blogger URL": row.blogger_url,
-                    "Retry Count": row.retry_count,
-                    "Last Error": row.last_error,
-                    "Updated At": row.updated_at
-                })
-            st.dataframe(
-                table_data,
-                column_config={
-                    "Blogger URL": st.column_config.LinkColumn("Blogger URL Link"),
-                },
-                use_container_width=True
-            )
-        else:
-            st.info("ไม่มีรายการข้อมูลประวัติการทำงานในแผ่นชีต")
-    except Exception as e:
-        st.error(f"ไม่สามารถโหลดสรุปข้อมูลตารางคิวงานได้: {e}")
+    col_history_btn1, col_history_btn2 = st.columns([1, 4])
+    with col_history_btn1:
+        if st.button("📥 โหลดแสดงตารางประวัติงาน"):
+            st.session_state['show_history_table'] = True
+    with col_history_btn2:
+        if st.session_state['show_history_table']:
+            if st.button("❌ ซ่อนตารางประวัติ"):
+                st.session_state['show_history_table'] = False
+                st.rerun()
+
+    if st.session_state['show_history_table']:
+        try:
+            all_rows = sheets_service.read_all_rows()
+            if all_rows:
+                # แปลงข้อมูลวัตถุ Pydantic เข้าสู่รูปแบบตารางเพื่อแสดงผลใน Streamlit
+                table_data = []
+                for row in reversed(all_rows): # กลับลำดับเพื่อให้แถวใหม่สุดอยู่บนสุด
+                    # ค้นหาป้ายประเภทบลูปริ้นต์
+                    row_type = getattr(row, 'content_type', 'business')
+                    bp_info = blueprints_data.get(row_type, blueprints_data["business"])
+                    
+                    table_data.append({
+                        "ID": row.id,
+                        "ประเภทคอนเทนต์": bp_info["label"],
+                        "Topic": row.topic,
+                        "Keyword": row.keyword,
+                        "Status": row.status,
+                        "SEO Title": row.seo_title,
+                        "Blogger URL": row.blogger_url,
+                        "Retry Count": row.retry_count,
+                        "Last Error": row.last_error,
+                        "Updated At": row.updated_at
+                    })
+                st.dataframe(
+                    table_data,
+                    column_config={
+                        "Blogger URL": st.column_config.LinkColumn("Blogger URL Link"),
+                    },
+                    use_container_width=True
+                )
+            else:
+                st.info("ไม่มีรายการข้อมูลประวัติการทำงานในแผ่นชีต")
+        except Exception as e:
+            st.error(f"ไม่สามารถโหลดสรุปข้อมูลตารางคิวงานได้ชั่วคราว: {e}")
