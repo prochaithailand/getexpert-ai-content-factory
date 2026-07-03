@@ -88,7 +88,7 @@ class SheetsService:
         self.spreadsheet_id = Settings.GOOGLE_SHEET_ID
         self.sheet_name = Settings.GOOGLE_SHEET_NAME
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def read_waiting_rows(self) -> List[SheetRow]:
         """
         ดึงค่าแถวข้อมูลทั้งหมดในช่วงคอลัมน์ A:AJ (36 คอลัมน์) และคัดกรองเฉพาะ Status = 'Waiting'
@@ -159,7 +159,7 @@ class SheetsService:
         logging.info(f"ค้นพบข้อมูลบทความรอคิวเขียนใหม่ (Status = Waiting) จำนวน: {len(waiting_rows)} รายการ")
         return waiting_rows
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def update_row_status(self, row_idx: int, status: str):
         """
         อัปเดตสถานะของแถวข้อมูล (Status ช่อง D และ Updated At ช่อง T)
@@ -184,7 +184,7 @@ class SheetsService:
             logging.error(f"ไม่สามารถอัปเดตสถานะของแถวที่ {row_idx} เป็น {status} ได้: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def update_row_success(self, row_idx: int, seo_content: SEOContent, post_id: str, url: str, retry_count: int):
         """
         อัปเดตข้อมูลบทความที่อัปโหลดสำเร็จลงใน Google Sheet
@@ -254,7 +254,7 @@ class SheetsService:
             logging.error(f"การบันทึกบทความและโซเชียลสำเร็จลงแผ่นชีตแถวที่ {row_idx} ล้มเหลว: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def update_row_failed(self, row_idx: int, error_msg: str, retry_count: int):
         """
         อัปเดตข้อมูลกรณีประมวลผลล้มเหลว (Status = Failed, บันทึก Retry Count และ Last Error)
@@ -290,7 +290,7 @@ class SheetsService:
             logging.error(f"ไม่สามารถเขียนสถานะความล้มเหลวของแถวที่ {row_idx} ลงชีตได้: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def add_new_row(
         self, 
         topic: str, 
@@ -362,7 +362,7 @@ class SheetsService:
         logging.info(f"เพิ่มหัวข้อใหม่และข้อมูลอินพุตแถวที่ {new_row_idx} (ID: {new_id}) ลงชีตสำเร็จ")
         return new_row_idx
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def get_row_by_index(self, row_idx: int) -> SheetRow:
         """
         ดึงข้อมูลแถวเฉพาะตามเลขดัชนีแถว (row_idx) รองรับ 36 คอลัมน์
@@ -419,7 +419,7 @@ class SheetsService:
             user_email=padded[35]
         )
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def read_all_rows(self) -> List[SheetRow]:
         """
         ดึงข้อมูลทุกแถวคิวประมวลผล (ช่วง A:AJ) เพื่อนำไปจัดแสดงในตารางคิวงานบนหน้า Web App
@@ -484,7 +484,7 @@ class SheetsService:
             all_rows.append(sheet_row)
         return all_rows
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def ensure_worksheet_exists(self, sheet_title: str, expected_headers: List[str]):
         """
         ตรวจสอบและสร้าง Worksheet ใหม่ใน Google Sheets หากยังไม่มีอยู่
@@ -526,7 +526,7 @@ class SheetsService:
             logging.error(f"ไม่สามารถตรวจสอบ/สร้างชีตย่อย '{sheet_title}' ได้: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def get_user_by_email(self, email: str):
         """
         ค้นหาข้อมูลผู้ใช้งานจากอีเมลในชีต Users คืนค่าเป็นโมเดล UserCredit หรือ None
@@ -566,7 +566,7 @@ class SheetsService:
             logging.error(f"เกิดข้อผิดพลาดในการค้นหาผู้ใช้ตามอีเมล: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def save_user_credit(self, user, row_idx: int = None):
         """
         บันทึกหรืออัปเดตข้อมูลผู้ใช้ลงชีต Users
@@ -613,7 +613,7 @@ class SheetsService:
             logging.error(f"ไม่สามารถบันทึกข้อมูลผู้ใช้ลงชีตได้: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def add_usage_log(self, log):
         """
         บันทึกรายการใช้งานเครดิตลงชีต Usage Logs
@@ -655,7 +655,7 @@ class SheetsService:
             logging.error(f"ไม่สามารถบันทึก Usage Log ลงชีตได้: {e}")
             raise e
 
-    @retry(max_retries=3, delays=[2, 5, 10])
+    @retry(max_retries=1, delays=[1])
     def add_payment_record(self, payment):
         """
         บันทึกข้อมูลการชำระเงินโอนซื้อเครดิตลงชีต Payments

@@ -120,25 +120,62 @@ if is_demo:
             user_name = st.text_input("ชื่อของคุณ (Name)", placeholder="สมชาย รักเรียน", key="demo_name_input").strip()
             
     # ตรวจสอบสิทธิ์เครดิต
-    is_eligible = False
-    credit_type = "blocked"
-    credit_balance = 0
-    status_msg = ""
-    
+    if 'demo_credit_checked_email' not in st.session_state:
+        st.session_state['demo_credit_checked_email'] = ""
+    if 'demo_is_eligible' not in st.session_state:
+        st.session_state['demo_is_eligible'] = False
+    if 'demo_credit_type' not in st.session_state:
+        st.session_state['demo_credit_type'] = "blocked"
+    if 'demo_credit_balance' not in st.session_state:
+        st.session_state['demo_credit_balance'] = 0
+    if 'demo_status_msg' not in st.session_state:
+        st.session_state['demo_status_msg'] = "กรุณากดปุ่มเพื่อตรวจสอบสิทธิ์การใช้งาน"
+
+    if user_email != st.session_state['demo_credit_checked_email']:
+        st.session_state['demo_is_eligible'] = False
+        st.session_state['demo_credit_type'] = "blocked"
+        st.session_state['demo_credit_balance'] = 0
+        st.session_state['demo_status_msg'] = "กรุณากดปุ่มเพื่อตรวจสอบเครดิตอีกครั้ง"
+
     if user_email:
-        credit_service = get_credit_service()
-        # ตรวจสอบหรือสร้างผู้ใช้
-        credit_service.get_or_create_user(user_email, user_name)
-        is_eligible, credit_type, credit_balance, status_msg = credit_service.check_credit_eligibility(user_email)
+        if st.button("🔍 ตรวจสอบเครดิตและสิทธิ์ใช้งาน", key="demo_verify_credit_btn"):
+            with st.spinner("กำลังเชื่อมต่อระบบฐานข้อมูลเครดิต..."):
+                try:
+                    credit_service = get_credit_service()
+                    credit_service.get_or_create_user(user_email, user_name)
+                    eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
+                    
+                    st.session_state['demo_is_eligible'] = eligible
+                    st.session_state['demo_credit_type'] = c_type
+                    st.session_state['demo_credit_balance'] = c_bal
+                    st.session_state['demo_status_msg'] = c_msg
+                    st.session_state['demo_credit_checked_email'] = user_email
+                    st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                except Exception as e:
+                    st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
+                    st.session_state['demo_is_eligible'] = False
+                    st.session_state['demo_credit_type'] = "blocked"
+                    st.session_state['demo_status_msg'] = "⚠️ เชื่อมต่อระบบเครดิตขัดข้องชั่วคราว"
+                    
+        is_eligible = st.session_state['demo_is_eligible']
+        credit_type = st.session_state['demo_credit_type']
+        credit_balance = st.session_state['demo_credit_balance']
+        status_msg = st.session_state['demo_status_msg']
         
-        # แสดงสถานะเครดิตบนหน้าบ้าน
-        if credit_type == "free":
-            st.info(f"💡 {status_msg} (คุณใช้สิทธิ์ฟรีไปแล้ว {3 - credit_balance} / 3 Content Packs)")
-        elif credit_type == "paid":
-            st.success(f"💎 {status_msg} (คุณเหลือเครดิต {credit_balance} Content Packs)")
-        elif credit_type == "blocked":
-            st.error(f"⚠️ {status_msg}")
+        if st.session_state['demo_credit_checked_email'] == user_email:
+            if credit_type == "free":
+                st.info(f"💡 {status_msg} (คุณใช้สิทธิ์ฟรีไปแล้ว {3 - credit_balance} / 3 Content Packs)")
+            elif credit_type == "paid":
+                st.success(f"💎 {status_msg} (คุณเหลือเครดิต {credit_balance} Content Packs)")
+            elif credit_type == "blocked":
+                st.error(f"⚠️ {status_msg}")
+        else:
+            st.warning("⚠️ มีการกรอกอีเมลใหม่ กรุณากดปุ่มเพื่อเริ่มตรวจสอบสิทธิ์")
     else:
+        is_eligible = False
+        credit_type = "blocked"
+        credit_balance = 0
+        status_msg = ""
         st.warning("⚠️ กรุณากรอกอีเมลของคุณด้านบนเพื่อตรวจสอบสิทธิ์การใช้งานก่อนเริ่มสร้างคอนเทนต์")
     
     # 2. Content Type Selector
@@ -184,88 +221,88 @@ if is_demo:
                 with st.form("demo_content_form", clear_on_submit=False):
                     blueprint_inputs = {}
                 
-                # แสดงฟอร์มตามลักษณะยุทธศาสตร์ประเภทที่เลือก (Dynamic Form)
-                if selected_content_type == "business":
-                    topic = st.text_input("หัวข้อที่ต้องการสร้างคอนเทนต์ *", placeholder="น้ำมันสนเข็มแดงช่วยบรรเทาอาการปวดเมื่อยได้อย่างไร")
-                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="น้ำมันสนเข็มแดง")
-                    st.write("---")
-                    st.markdown("**🎯 ข้อมูลแนวทางแบรนด์ (Brand Guidelines)**")
-                    blueprint_inputs["business_name"] = st.text_input("ชื่อธุรกิจ / สินค้าของคุณคืออะไร", placeholder="เช่น GetExpert คลินิกสุขภาพ")
-                    blueprint_inputs["target_audience"] = st.text_input("ลูกค้ากลุ่มเป้าหมายคือใคร", placeholder="เช่น คนวัยทำงานที่มีอาการปวดเมื่อยคอบ่าไหล่")
-                    blueprint_inputs["customer_problem"] = st.text_input("ปัญหาหลักของลูกค้าคืออะไร", placeholder="เช่น ปวดเมื่อยเรื้อรังจากออฟฟิศซินโดรม")
-                    blueprint_inputs["unique_value"] = st.text_input("จุดเด่นของสินค้า / บริการ", placeholder="เช่น สกัดจากสมุนไพรธรรมชาติซึมไวไม่เหนียวเหนอะหนะ")
-                    blueprint_inputs["marketing_goal"] = st.text_input("เป้าหมายการตลาด", placeholder="เช่น สร้างความเชื่อมั่นและเพิ่มยอดขาย")
-                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เป็นกันเอง เข้าใจง่าย น่าเชื่อถือ")
-                    blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น สั่งซื้อวันนี้รับส่วนลด 20%")
+                    # แสดงฟอร์มตามลักษณะยุทธศาสตร์ประเภทที่เลือก (Dynamic Form)
+                    if selected_content_type == "business":
+                        topic = st.text_input("หัวข้อที่ต้องการสร้างคอนเทนต์ *", placeholder="น้ำมันสนเข็มแดงช่วยบรรเทาอาการปวดเมื่อยได้อย่างไร")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="น้ำมันสนเข็มแดง")
+                        st.write("---")
+                        st.markdown("**🎯 ข้อมูลแนวทางแบรนด์ (Brand Guidelines)**")
+                        blueprint_inputs["business_name"] = st.text_input("ชื่อธุรกิจ / สินค้าของคุณคืออะไร", placeholder="เช่น GetExpert คลินิกสุขภาพ")
+                        blueprint_inputs["target_audience"] = st.text_input("ลูกค้ากลุ่มเป้าหมายคือใคร", placeholder="เช่น คนวัยทำงานที่มีอาการปวดเมื่อยคอบ่าไหล่")
+                        blueprint_inputs["customer_problem"] = st.text_input("ปัญหาหลักของลูกค้าคืออะไร", placeholder="เช่น ปวดเมื่อยเรื้อรังจากออฟฟิศซินโดรม")
+                        blueprint_inputs["unique_value"] = st.text_input("จุดเด่นของสินค้า / บริการ", placeholder="เช่น สกัดจากสมุนไพรธรรมชาติซึมไวไม่เหนียวเหนอะหนะ")
+                        blueprint_inputs["marketing_goal"] = st.text_input("เป้าหมายการตลาด", placeholder="เช่น สร้างความเชื่อมั่นและเพิ่มยอดขาย")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เป็นกันเอง เข้าใจง่าย น่าเชื่อถือ")
+                        blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น สั่งซื้อวันนี้รับส่วนลด 20%")
                     
-                elif selected_content_type == "government":
-                    topic = st.text_input("หัวข้อประชาสัมพันธ์ *", placeholder="โครงการจัดการขยะอิเล็กทรอนิกส์ในชุมชน")
-                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="ขยะอิเล็กทรอนิกส์, จัดการขยะ")
-                    st.write("---")
-                    st.markdown("**🏛 ข้อมูลประชาสัมพันธ์ภาครัฐ (Government Context)**")
-                    blueprint_inputs["agency_name"] = st.text_input("ชื่อหน่วยงานราชการของคุณ", placeholder="เช่น เทศบาลตำบลแสนสุข")
-                    blueprint_inputs["public_target"] = st.text_input("ประชาชนกลุ่มเป้าหมาย", placeholder="เช่น ผู้อยู่อาศัยในเขตเทศบาลแสนสุข")
-                    blueprint_inputs["project_objective"] = st.text_input("วัตถุประสงค์ของโครงการ", placeholder="เช่น รณรงค์แยกทิ้งขยะอันตรายอย่างถูกวิธี")
-                    blueprint_inputs["public_benefit"] = st.text_input("ประโยชน์ที่ประชาชนจะได้รับ", placeholder="เช่น ชุมชนสะอาด ปลอดภัยจากสารพิษตกค้าง")
-                    blueprint_inputs["key_information"] = st.text_input("ข้อมูลสำคัญที่ต้องการแจ้ง", placeholder="เช่น จุดบริการรับทิ้งขยะทุกวันเสาร์ที่ลานหน้าอำเภอ")
-                    blueprint_inputs["contact_channel"] = st.text_input("ช่องทางติดต่อ / เข้าร่วม", placeholder="เช่น โทรสายด่วนเทศบาล 1133 หรือเพจเทศบาล")
-                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สุภาพ เป็นทางการ น่าเชื่อถือ เข้าใจง่าย")
+                    elif selected_content_type == "government":
+                        topic = st.text_input("หัวข้อประชาสัมพันธ์ *", placeholder="โครงการจัดการขยะอิเล็กทรอนิกส์ในชุมชน")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="ขยะอิเล็กทรอนิกส์, จัดการขยะ")
+                        st.write("---")
+                        st.markdown("**🏛 ข้อมูลประชาสัมพันธ์ภาครัฐ (Government Context)**")
+                        blueprint_inputs["agency_name"] = st.text_input("ชื่อหน่วยงานราชการของคุณ", placeholder="เช่น เทศบาลตำบลแสนสุข")
+                        blueprint_inputs["public_target"] = st.text_input("ประชาชนกลุ่มเป้าหมาย", placeholder="เช่น ผู้อยู่อาศัยในเขตเทศบาลแสนสุข")
+                        blueprint_inputs["project_objective"] = st.text_input("วัตถุประสงค์ของโครงการ", placeholder="เช่น รณรงค์แยกทิ้งขยะอันตรายอย่างถูกวิธี")
+                        blueprint_inputs["public_benefit"] = st.text_input("ประโยชน์ที่ประชาชนจะได้รับ", placeholder="เช่น ชุมชนสะอาด ปลอดภัยจากสารพิษตกค้าง")
+                        blueprint_inputs["key_information"] = st.text_input("ข้อมูลสำคัญที่ต้องการแจ้ง", placeholder="เช่น จุดบริการรับทิ้งขยะทุกวันเสาร์ที่ลานหน้าอำเภอ")
+                        blueprint_inputs["contact_channel"] = st.text_input("ช่องทางติดต่อ / เข้าร่วม", placeholder="เช่น โทรสายด่วนเทศบาล 1133 หรือเพจเทศบาล")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สุภาพ เป็นทางการ น่าเชื่อถือ เข้าใจง่าย")
                     
-                elif selected_content_type == "csr":
-                    topic = st.text_input("ชื่อโครงการ / แคมเปญ *", placeholder="แคมเปญบริจาคหนังสือเก่าเพื่อน้องในชนบท")
-                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="บริจาคหนังสือ, ปันความรู้")
-                    st.write("---")
-                    st.markdown("**❤️ ข้อมูลโครงการเพื่อสังคม (CSR Impact Context)**")
-                    blueprint_inputs["campaign_name"] = st.text_input("ชื่อแคมเปญเพื่อสังคม", placeholder="เช่น โครงการห้องสมุดปันฝัน")
-                    blueprint_inputs["social_problem"] = st.text_input("ปัญหาสังคมที่ต้องการแก้", placeholder="เช่น โรงเรียนชายขอบขาดแคลนหนังสือเสริมทักษะ")
-                    blueprint_inputs["affected_group"] = st.text_input("กลุ่มเป้าหมายที่ได้รับผลกระทบ", placeholder="เช่น นักเรียนโรงเรียนบ้านดอยสามสิบ")
-                    blueprint_inputs["campaign_goal"] = st.text_input("เป้าหมายของโครงการ", placeholder="เช่น รวบรวมหนังสืออ่านนอกเวลาจำนวน 500 เล่ม")
-                    blueprint_inputs["expected_impact"] = st.text_input("ผลลัพธ์ที่คาดหวัง", placeholder="เช่น ช่วยพัฒนาทักษะการอ่านและส่งเสริมโอกาสเด็กไทย")
-                    blueprint_inputs["participation_invite"] = st.text_input("สิ่งที่อยากเชิญชวนให้คนมีส่วนร่วม", placeholder="เช่น เชิญชวนบริจาคหนังสือสภาพดีที่จุดรับบริจาค")
-                    blueprint_inputs["organization_name"] = st.text_input("หน่วยงาน / องค์กรเจ้าของโครงการ", placeholder="เช่น บริษัท กรีนคอร์ป ร่วมกับ มูลนิธิปัญญา")
-                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สร้างแรงบันดาลใจ อบอุ่น มีความหวัง เชิญชวน")
+                    elif selected_content_type == "csr":
+                        topic = st.text_input("ชื่อโครงการ / แคมเปญ *", placeholder="แคมเปญบริจาคหนังสือเก่าเพื่อน้องในชนบท")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="บริจาคหนังสือ, ปันความรู้")
+                        st.write("---")
+                        st.markdown("**❤️ ข้อมูลโครงการเพื่อสังคม (CSR Impact Context)**")
+                        blueprint_inputs["campaign_name"] = st.text_input("ชื่อแคมเปญเพื่อสังคม", placeholder="เช่น โครงการห้องสมุดปันฝัน")
+                        blueprint_inputs["social_problem"] = st.text_input("ปัญหาสังคมที่ต้องการแก้", placeholder="เช่น โรงเรียนชายขอบขาดแคลนหนังสือเสริมทักษะ")
+                        blueprint_inputs["affected_group"] = st.text_input("กลุ่มเป้าหมายที่ได้รับผลกระทบ", placeholder="เช่น นักเรียนโรงเรียนบ้านดอยสามสิบ")
+                        blueprint_inputs["campaign_goal"] = st.text_input("เป้าหมายของโครงการ", placeholder="เช่น รวบรวมหนังสืออ่านนอกเวลาจำนวน 500 เล่ม")
+                        blueprint_inputs["expected_impact"] = st.text_input("ผลลัพธ์ที่คาดหวัง", placeholder="เช่น ช่วยพัฒนาทักษะการอ่านและส่งเสริมโอกาสเด็กไทย")
+                        blueprint_inputs["participation_invite"] = st.text_input("สิ่งที่อยากเชิญชวนให้คนมีส่วนร่วม", placeholder="เช่น เชิญชวนบริจาคหนังสือสภาพดีที่จุดรับบริจาค")
+                        blueprint_inputs["organization_name"] = st.text_input("หน่วยงาน / องค์กรเจ้าของโครงการ", placeholder="เช่น บริษัท กรีนคอร์ป ร่วมกับ มูลนิธิปัญญา")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น สร้างแรงบันดาลใจ อบอุ่น มีความหวัง เชิญชวน")
                     
-                elif selected_content_type == "education":
-                    topic = st.text_input("หัวข้อบทเรียน / กิจกรรม *", placeholder="พื้นฐานการประหยัดพลังงานไฟฟ้าง่ายๆ ในชีวิตประจำวัน")
-                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="ประหยัดไฟฟ้า, พลังงานในบ้าน")
-                    st.write("---")
-                    st.markdown("**🎓 ข้อมูลด้านการศึกษา (Educational Context)**")
-                    blueprint_inputs["institution_name"] = st.text_input("ชื่อสถาบันการศึกษา / มหาวิทยาลัย", placeholder="เช่น โรงเรียนวิทยารักษ์ หรือคอร์สออนไลน์ GetAcademy")
-                    blueprint_inputs["learner_group"] = st.text_input("ระดับชั้น / กลุ่มผู้เรียน", placeholder="เช่น นักเรียนมัธยมศึกษาตอนต้น หรือผู้เรียนทั่วไป")
-                    blueprint_inputs["learning_objective"] = st.text_input("วัตถุประสงค์การเรียนรู้", placeholder="เช่น เพื่อเข้าใจการเลือกใช้เครื่องใช้ไฟฟ้าอย่างประหยัดและถูกวิธี")
-                    blueprint_inputs["core_knowledge"] = st.text_input("สาระสำคัญที่ต้องการสื่อ", placeholder="เช่น การปิดไฟดวงที่ไม่ใช้, เลือกใช้แอร์เบอร์ 5, คำนวณค่าไฟคร่าวๆ")
-                    blueprint_inputs["expected_outcome"] = st.text_input("ผลลัพธ์ที่คาดหวังจากผู้เรียน", placeholder="เช่น ปรับเปลี่ยนพฤติกรรมเพื่อช่วยลดรายจ่ายในครอบครัว")
-                    blueprint_inputs["content_format"] = st.text_input("รูปแบบเนื้อหาที่ต้องการ", placeholder="เช่น บทเรียนสรุปสั้น 3 ประเด็นสำคัญพร้อมข้อดี")
-                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เข้าใจง่าย มีเหตุผลเชิงวิทยาศาสตร์ สนุกสนานและสร้างสรรค์")
+                    elif selected_content_type == "education":
+                        topic = st.text_input("หัวข้อบทเรียน / กิจกรรม *", placeholder="พื้นฐานการประหยัดพลังงานไฟฟ้าง่ายๆ ในชีวิตประจำวัน")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="ประหยัดไฟฟ้า, พลังงานในบ้าน")
+                        st.write("---")
+                        st.markdown("**🎓 ข้อมูลด้านการศึกษา (Educational Context)**")
+                        blueprint_inputs["institution_name"] = st.text_input("ชื่อสถาบันการศึกษา / มหาวิทยาลัย", placeholder="เช่น โรงเรียนวิทยารักษ์ หรือคอร์สออนไลน์ GetAcademy")
+                        blueprint_inputs["learner_group"] = st.text_input("ระดับชั้น / กลุ่มผู้เรียน", placeholder="เช่น นักเรียนมัธยมศึกษาตอนต้น หรือผู้เรียนทั่วไป")
+                        blueprint_inputs["learning_objective"] = st.text_input("วัตถุประสงค์การเรียนรู้", placeholder="เช่น เพื่อเข้าใจการเลือกใช้เครื่องใช้ไฟฟ้าอย่างประหยัดและถูกวิธี")
+                        blueprint_inputs["core_knowledge"] = st.text_input("สาระสำคัญที่ต้องการสื่อ", placeholder="เช่น การปิดไฟดวงที่ไม่ใช้, เลือกใช้แอร์เบอร์ 5, คำนวณค่าไฟคร่าวๆ")
+                        blueprint_inputs["expected_outcome"] = st.text_input("ผลลัพธ์ที่คาดหวังจากผู้เรียน", placeholder="เช่น ปรับเปลี่ยนพฤติกรรมเพื่อช่วยลดรายจ่ายในครอบครัว")
+                        blueprint_inputs["content_format"] = st.text_input("รูปแบบเนื้อหาที่ต้องการ", placeholder="เช่น บทเรียนสรุปสั้น 3 ประเด็นสำคัญพร้อมข้อดี")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เข้าใจง่าย มีเหตุผลเชิงวิทยาศาสตร์ สนุกสนานและสร้างสรรค์")
                     
-                elif selected_content_type == "event":
-                    topic = st.text_input("ชื่องาน / กิจกรรม *", placeholder="งานสัมมนาติดอาวุธการเขียนบทความยอดขายล้านวิว")
-                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="สัมมนาการเขียน, Content Marketing")
-                    st.write("---")
-                    st.markdown("**🎉 ข้อมูลการประชาสัมพันธ์กิจกรรม (Event Context)**")
-                    blueprint_inputs["event_name"] = st.text_input("ชื่อกิจกรรมประชาสัมพันธ์", placeholder="เช่น สัมมนา Write to Millionaire")
-                    blueprint_inputs["organizer_name"] = st.text_input("หน่วยงานหรือผู้จัด", placeholder="เช่น GetExpert AI Content Platform")
-                    blueprint_inputs["event_objective"] = st.text_input("วัตถุประสงค์ของงาน", placeholder="เช่น เพื่อเผยแพร่เทคนิคการทำ Content Marketing ยอดคนดูเยอะ")
-                    blueprint_inputs["date_time_location"] = st.text_input("วัน เวลา สถานที่จัดงาน", placeholder="เช่น วันที่ 25 กรกฎาคม 2570 เวลา 13:00 - 17:00 น. ณ ฮอลล์ 5 ไบเทคบางนา")
-                    blueprint_inputs["event_highlights"] = st.text_input("จุดเด่นของงาน", placeholder="เช่น แขกรับเชิญพิเศษจากครีเอเตอร์ชื่อดัง และแจกคอร์สสรุปฟรี")
-                    blueprint_inputs["attendee_benefits"] = st.text_input("สิ่งที่ผู้เข้าร่วมจะได้รับ", placeholder="เช่น ไฟล์เทมเพลตโพสต์เขียน 10 แบบฟรี และเครือข่ายผู้เข้าร่วมงาน")
-                    blueprint_inputs["registration_channel"] = st.text_input("ช่องทางลงทะเบียน / ติดต่อ", placeholder="เช่น แอดไลน์ @getexpert หรือจองตั๋วผ่าน getexpert.co/tickets")
-                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น กระตุ้นความสนใจ น่าตื่นเต้น เชื้อเชิญ กระชับชัดเจน")
+                    elif selected_content_type == "event":
+                        topic = st.text_input("ชื่องาน / กิจกรรม *", placeholder="งานสัมมนาติดอาวุธการเขียนบทความยอดขายล้านวิว")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="สัมมนาการเขียน, Content Marketing")
+                        st.write("---")
+                        st.markdown("**🎉 ข้อมูลการประชาสัมพันธ์กิจกรรม (Event Context)**")
+                        blueprint_inputs["event_name"] = st.text_input("ชื่อกิจกรรมประชาสัมพันธ์", placeholder="เช่น สัมมนา Write to Millionaire")
+                        blueprint_inputs["organizer_name"] = st.text_input("หน่วยงานหรือผู้จัด", placeholder="เช่น GetExpert AI Content Platform")
+                        blueprint_inputs["event_objective"] = st.text_input("วัตถุประสงค์ของงาน", placeholder="เช่น เพื่อเผยแพร่เทคนิคการทำ Content Marketing ยอดคนดูเยอะ")
+                        blueprint_inputs["date_time_location"] = st.text_input("วัน เวลา สถานที่จัดงาน", placeholder="เช่น วันที่ 25 กรกฎาคม 2570 เวลา 13:00 - 17:00 น. ณ ฮอลล์ 5 ไบเทคบางนา")
+                        blueprint_inputs["event_highlights"] = st.text_input("จุดเด่นของงาน", placeholder="เช่น แขกรับเชิญพิเศษจากครีเอเตอร์ชื่อดัง และแจกคอร์สสรุปฟรี")
+                        blueprint_inputs["attendee_benefits"] = st.text_input("สิ่งที่ผู้เข้าร่วมจะได้รับ", placeholder="เช่น ไฟล์เทมเพลตโพสต์เขียน 10 แบบฟรี และเครือข่ายผู้เข้าร่วมงาน")
+                        blueprint_inputs["registration_channel"] = st.text_input("ช่องทางลงทะเบียน / ติดต่อ", placeholder="เช่น แอดไลน์ @getexpert หรือจองตั๋วผ่าน getexpert.co/tickets")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น กระตุ้นความสนใจ น่าตื่นเต้น เชื้อเชิญ กระชับชัดเจน")
                     
-                elif selected_content_type == "personal_brand":
-                    topic = st.text_input("หัวข้อที่ต้องการสื่อสาร *", placeholder="บทเรียนที่สำคัญที่สุดที่ผมเรียนรู้หลังจากเจ๊งธุรกิจรอบแรก")
-                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="บทเรียนการทำธุรกิจ, ถอดบทเรียนความล้มเหลว")
-                    st.write("---")
-                    st.markdown("**👤 ข้อมูลแบรนด์บุคคล (Personal Branding)**")
-                    blueprint_inputs["expert_niche"] = st.text_input("ความเชี่ยวชาญ / กลุ่มวิชาชีพของคุณ", placeholder="เช่น ที่ปรึกษาผู้บริหารและนักวางกลยุทธ์ธุรกิจ")
-                    blueprint_inputs["target_followers"] = st.text_input("ผู้ติดตามหรือกลุ่มเป้าหมายคือใคร", placeholder="เช่น เจ้าของธุรกิจรุ่นใหม่และพนักงานฝันอยากมีธุรกิจ")
-                    blueprint_inputs["experience_story"] = st.text_input("ประสบการณ์หรือมุมมองสำคัญที่เล่า", placeholder="เช่น ประสบการณ์จัดงบการเงินพังจนต้องปิดร้านกาแฟร้านแรกในชีวิต")
-                    blueprint_inputs["core_identity"] = st.text_input("ภาพลักษณ์ที่ต้องการสร้าง", placeholder="เช่น ผู้เชี่ยวชาญตัวจริง ตรงไปตรงมา มีความจริงใจพร้อมแบ่งปัน")
-                    blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น กระแสเงินสดสำคัญกว่ากำไรทางบัญชีเสมอ")
-                    blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องแบบภาพยนตร์ จริงใจ เป็นธรรมชาติ ถ่อมตัวแต่มีความรู้")
-                    blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น กดแชร์แบ่งปันบทเรียนนี้ หรือลงทะเบียนรับข่าวสารรายสัปดาห์")
+                    elif selected_content_type == "personal_brand":
+                        topic = st.text_input("หัวข้อที่ต้องการสื่อสาร *", placeholder="บทเรียนที่สำคัญที่สุดที่ผมเรียนรู้หลังจากเจ๊งธุรกิจรอบแรก")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="บทเรียนการทำธุรกิจ, ถอดบทเรียนความล้มเหลว")
+                        st.write("---")
+                        st.markdown("**👤 ข้อมูลแบรนด์บุคคล (Personal Branding)**")
+                        blueprint_inputs["expert_niche"] = st.text_input("ความเชี่ยวชาญ / กลุ่มวิชาชีพของคุณ", placeholder="เช่น ที่ปรึกษาผู้บริหารและนักวางกลยุทธ์ธุรกิจ")
+                        blueprint_inputs["target_followers"] = st.text_input("ผู้ติดตามหรือกลุ่มเป้าหมายคือใคร", placeholder="เช่น เจ้าของธุรกิจรุ่นใหม่และพนักงานฝันอยากมีธุรกิจ")
+                        blueprint_inputs["experience_story"] = st.text_input("ประสบการณ์หรือมุมมองสำคัญที่เล่า", placeholder="เช่น ประสบการณ์จัดงบการเงินพังจนต้องปิดร้านกาแฟร้านแรกในชีวิต")
+                        blueprint_inputs["core_identity"] = st.text_input("ภาพลักษณ์ที่ต้องการสร้าง", placeholder="เช่น ผู้เชี่ยวชาญตัวจริง ตรงไปตรงมา มีความจริงใจพร้อมแบ่งปัน")
+                        blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น กระแสเงินสดสำคัญกว่ากำไรทางบัญชีเสมอ")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องแบบภาพยนตร์ จริงใจ เป็นธรรมชาติ ถ่อมตัวแต่มีความรู้")
+                        blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น กดแชร์แบ่งปันบทเรียนนี้ หรือลงทะเบียนรับข่าวสารรายสัปดาห์")
 
-                submitted = st.form_submit_button("✨ สร้าง Content Pack", disabled=st.session_state.get('is_processing', False))
+                    submitted = st.form_submit_button("✨ สร้าง Content Pack", disabled=st.session_state.get('is_processing', False))
                 
                 if submitted:
                     if not topic or not keyword:
@@ -519,25 +556,62 @@ else:
             user_name = st.text_input("ชื่อของคุณ (Name)", placeholder="สมชาย รักเรียน", key="std_name_input").strip()
 
     # ตรวจสอบสิทธิ์เครดิต
-    is_eligible = False
-    credit_type = "blocked"
-    credit_balance = 0
-    status_msg = ""
+    if 'std_credit_checked_email' not in st.session_state:
+        st.session_state['std_credit_checked_email'] = ""
+    if 'std_is_eligible' not in st.session_state:
+        st.session_state['std_is_eligible'] = False
+    if 'std_credit_type' not in st.session_state:
+        st.session_state['std_credit_type'] = "blocked"
+    if 'std_credit_balance' not in st.session_state:
+        st.session_state['std_credit_balance'] = 0
+    if 'std_status_msg' not in st.session_state:
+        st.session_state['std_status_msg'] = "กรุณากดปุ่มเพื่อตรวจสอบสิทธิ์การใช้งาน"
+
+    if user_email != st.session_state['std_credit_checked_email']:
+        st.session_state['std_is_eligible'] = False
+        st.session_state['std_credit_type'] = "blocked"
+        st.session_state['std_credit_balance'] = 0
+        st.session_state['std_status_msg'] = "กรุณากดปุ่มเพื่อตรวจสอบเครดิตอีกครั้ง"
 
     if user_email:
-        credit_service = get_credit_service()
-        # ตรวจสอบหรือสร้างผู้ใช้
-        credit_service.get_or_create_user(user_email, user_name)
-        is_eligible, credit_type, credit_balance, status_msg = credit_service.check_credit_eligibility(user_email)
-
-        # แสดงสถานะเครดิตบนหน้าบ้าน
-        if credit_type == "free":
-            st.info(f"💡 {status_msg} (คุณใช้สิทธิ์ฟรีไปแล้ว {3 - credit_balance} / 3 Content Packs)")
-        elif credit_type == "paid":
-            st.success(f"💎 {status_msg} (คุณเหลือเครดิต {credit_balance} Content Packs)")
-        elif credit_type == "blocked":
-            st.error(f"⚠️ {status_msg}")
+        if st.button("🔍 ตรวจสอบเครดิตและสิทธิ์ใช้งาน", key="std_verify_credit_btn"):
+            with st.spinner("กำลังเชื่อมต่อระบบฐานข้อมูลเครดิต..."):
+                try:
+                    credit_service = get_credit_service()
+                    credit_service.get_or_create_user(user_email, user_name)
+                    eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
+                    
+                    st.session_state['std_is_eligible'] = eligible
+                    st.session_state['std_credit_type'] = c_type
+                    st.session_state['std_credit_balance'] = c_bal
+                    st.session_state['std_status_msg'] = c_msg
+                    st.session_state['std_credit_checked_email'] = user_email
+                    st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                except Exception as e:
+                    st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
+                    st.session_state['std_is_eligible'] = False
+                    st.session_state['std_credit_type'] = "blocked"
+                    st.session_state['std_status_msg'] = "⚠️ เชื่อมต่อระบบเครดิตขัดข้องชั่วคราว"
+                    
+        is_eligible = st.session_state['std_is_eligible']
+        credit_type = st.session_state['std_credit_type']
+        credit_balance = st.session_state['std_credit_balance']
+        status_msg = st.session_state['std_status_msg']
+        
+        if st.session_state['std_credit_checked_email'] == user_email:
+            if credit_type == "free":
+                st.info(f"💡 {status_msg} (คุณใช้สิทธิ์ฟรีไปแล้ว {3 - credit_balance} / 3 Content Packs)")
+            elif credit_type == "paid":
+                st.success(f"💎 {status_msg} (คุณเหลือเครดิต {credit_balance} Content Packs)")
+            elif credit_type == "blocked":
+                st.error(f"⚠️ {status_msg}")
+        else:
+            st.warning("⚠️ มีการกรอกอีเมลใหม่ กรุณากดปุ่มเพื่อเริ่มตรวจสอบสิทธิ์")
     else:
+        is_eligible = False
+        credit_type = "blocked"
+        credit_balance = 0
+        status_msg = ""
         st.warning("⚠️ กรุณากรอกอีเมลของคุณด้านบนเพื่อตรวจสอบสิทธิ์การใช้งานก่อนเริ่มสร้างคอนเทนต์")
 
     # 2. Content Type Selector
