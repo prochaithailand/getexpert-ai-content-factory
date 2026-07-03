@@ -94,7 +94,7 @@ def show_payment_gate():
     from pathlib import Path
     qr_path = Path("assets/payment_qr.png")
     if qr_path.exists():
-        st.image(str(qr_path), caption="สแกนเพื่อชำระเงิน 99 บาท", use_container_width=True)
+        st.image(str(qr_path), caption="สแกนเพื่อชำระเงิน 99 บาท", width=320)
     else:
         st.warning("⚠️ กรุณาเพิ่มไฟล์ QR Code ที่ assets/payment_qr.png")
         
