@@ -106,11 +106,40 @@ def show_payment_gate():
     4. Admin จะตรวจสอบและเติมเครดิตให้ในระบบ
     """)
 
-    st.link_button(
-        "💬 ส่งสลิปและแจ้งอีเมลทาง LINE OA",
-        "https://lin.ee/TZgX4CD",
-        use_container_width=True
+    line_oa_url = "https://lin.ee/TZgX4CD"
+    
+    st.markdown(
+        f"""
+        <a href="{line_oa_url}" target="_self" style="
+            display:block;
+            text-align:center;
+            background:#06C755;
+            color:white;
+            padding:14px 18px;
+            border-radius:10px;
+            font-size:18px;
+            font-weight:700;
+            text-decoration:none;
+            margin:12px 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        ">
+            💬 เปิด LINE OA เพื่อส่งสลิป
+        </a>
+        """,
+        unsafe_allow_html=True
     )
+
+    st.markdown(f"[เปิด LINE OA สำรอง]({line_oa_url})")
+
+    st.markdown(f"""
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px; margin-bottom: 10px;">
+        <span style="font-size: 13px; color: #475569;">
+            💡 <b>คำแนะนำเพิ่มเติม:</b> หากแตะปุ่มด้านบนแล้วแอป LINE ไม่เปิดทำงานอัตโนมัติ ให้คัดลอกลิงก์นี้ไปวางในเบราว์เซอร์เพื่อแชทได้ทันที:
+            <br>
+            <code style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 14px;">{line_oa_url}</code>
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("""
     ---
