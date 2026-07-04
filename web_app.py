@@ -101,14 +101,14 @@ def show_payment_gate():
     st.markdown("""
     #### 📌 วิธีชำระเงิน:
     1. สแกน QR Code ด้านบนเพื่อชำระเงิน
-    2. หลังโอนเงินแล้ว กรุณาส่งสลิปมาที่ LINE OA: **@774dfect** (หรือกดลิงก์ [https://line.ee/774dfect](https://line.ee/774dfect))
+    2. หลังโอนเงินแล้ว กรุณาส่งสลิปมาที่ LINE OA: **@774dfect** (หรือกดลิงก์ [https://lin.ee/TZgX4CD](https://lin.ee/TZgX4CD))
     3. แจ้ง Email ที่ใช้ในระบบ
     4. Admin จะตรวจสอบและเติมเครดิตให้ในระบบ
     """)
 
     st.link_button(
         "💬 ส่งสลิปและแจ้งอีเมลทาง LINE OA",
-        "https://line.ee/774dfect",
+        "https://lin.ee/TZgX4CD",
         use_container_width=True
     )
 
@@ -119,7 +119,7 @@ def show_payment_gate():
 
     *ช่องทางติดต่อ:*
     - LINE OA: **@774dfect**
-    - ลิงก์ติดต่อ: [https://line.ee/774dfect](https://line.ee/774dfect)
+    - ลิงก์ติดต่อ: [https://lin.ee/TZgX4CD](https://lin.ee/TZgX4CD)
     """)
 
 def show_history_row_details(row_data, key_prefix=""):
