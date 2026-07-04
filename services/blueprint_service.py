@@ -52,7 +52,7 @@ class BlueprintService:
         desc += f"2. facebook_hashtags: แฮชแท็กที่เหมาะสม 5-10 ตัว\n"
         desc += f"3. tiktok_hook: ประโยคเปิดตัวคลิปสั้นดึงดูดสายตา 3 วินาทีแรก\n"
         desc += f"4. tiktok_script: สคริปต์สั้นบทพูดและแนวภาพสำหรับ: {outputs.get('tiktok_script', 'Short Video Script')}\n"
-        desc += f"5. youtube_shorts_script: สคริปต์สั้นหรือแนวข้อความสั้นสำหรับ: {outputs.get('youtube_script', 'Video Script')}\n"
+        desc += f"5. youtube_shorts_script: สคริปต์สั้นหรือแนวข้อความสั้นสำหรับ: {outputs.get('youtube_script', 'Video Script')} (จัดรูปแบบขึ้นบรรทัดใหม่เว้นระยะห่างระหว่างแต่ละฉาก [Scene] หรือฉากบทพูดแต่ละฉากให้ชัดเจนและเว้นวรรคกว้างเพื่อให้อ่านง่ายบนมือถือ)\n"
         desc += f"6. youtube_title: หัวแนะนำชื่อคลิปวิดีโอหรือหัวข้อสั้นที่เกี่ยวข้อง\n"
         desc += f"7. youtube_description: คำอธิบายประกอบสรุปความยาวไม่เกิน 150 คำ"
         return desc

@@ -70,7 +70,7 @@ class GeminiService:
             output_labels_str=output_labels_str
         )
         
-        logging.info(f"กำลังส่งสัญญานเรียกเขียนบทความไปยัง Gemini Model: '{self.model_name}' (ประเภทบลูปริ้นต์: {content_type})...")
+        logging.info(f"กำลังส่งสัญญาณเรียกเขียนบทความไปยัง Gemini Model: '{self.model_name}' (ประเภทบลูปริ้นต์: {content_type})...")
         
         try:
             # ยิงเรียก Gemini API พร้อมบีบบังคับโครงสร้างการตอบกลับผ่าน Pydantic Model (SEOContent)

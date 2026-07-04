@@ -51,6 +51,15 @@ st.markdown("""
     .status-processing { background-color: #b8daff; color: #004085; }
     .status-drafted { background-color: #c3e6cb; color: #155724; }
     .status-failed { background-color: #f5c6cb; color: #721c24; }
+    /* Optimize touch scrolling for Streamlit tabs on mobile */
+    div[data-testid="stTabBar"] {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    div[data-testid="stHorizontalBlock"] {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -888,7 +897,7 @@ if is_demo:
                             
                         except Exception as err:
                             st.session_state['is_processing'] = False
-                            st.error(f"เกิดข้อผิดพลาดในการประมวลผลสัญญาน: {err}")
+                            st.error(f"เกิดข้อผิดพลาดในการประมวลผลสัญญาณ: {err}")
                             # บันทึกประวัติความล้มเหลวลงในชีต Usage Logs โดยไม่หักแต้มเครดิต
                             try:
                                 credit_service = get_credit_service()
@@ -1174,7 +1183,7 @@ else:
                     st.markdown("**👤 ข้อมูลแบรนด์บุคคล (Personal Branding)**")
                     blueprint_inputs["expert_niche"] = st.text_input("ความเชี่ยวชาญ / กลุ่มวิชาชีพของคุณ", placeholder="เช่น โค้ชพัฒนาทักษะและความก้าวหน้าในอาชีพ")
                     blueprint_inputs["target_followers"] = st.text_input("ผู้ติดตามหรือกลุ่มเป้าหมายคือใคร", placeholder="เช่น ฟรีแลนซ์และพนักงานออฟฟิศที่เผชิญภาวะงานทับตัว")
-                    blueprint_inputs["experience_story"] = st.text_input("ประสบการณ์หรือมุมมองสำคัญที่เล่า", placeholder="เช่น เคยล้มป่วยจากสัญญานทำงานหามรุ่งหามค่ำจนเปลี่ยนชีวิต")
+                    blueprint_inputs["experience_story"] = st.text_input("ประสบการณ์หรือมุมมองสำคัญที่เล่า", placeholder="เช่น เคยล้มป่วยจากสัญญาณทำงานหามรุ่งหามค่ำจนเปลี่ยนชีวิต")
                     blueprint_inputs["core_identity"] = st.text_input("ภาพลักษณ์ที่ต้องการสร้าง", placeholder="เช่น ผู้ให้คำปรึกษาที่ให้ผลลัพธ์ที่เป็นความจริง สไตล์จริงใจตรงไปตรงมา")
                     blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น การปัดปฏิเสธงานไม่สำคัญคือทักษะการเพิ่มผลิตภาพที่แท้จริง")
                     blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องผ่านตัวคุณ เป็นกันเองจริงใจ มีความสุภาพแต่น่าฟัง")
