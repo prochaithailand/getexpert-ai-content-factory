@@ -204,5 +204,37 @@ CONTENT_BLUEPRINTS = {
             "youtube_script": "🔴 สคริปต์สั้นถอดบทเรียนชีวิต (YouTube)",
             "image_prompt": "🎨 ภาพประกอบสร้างแบรนด์ตัวบุคคล"
         }
+    },
+    
+    "instagram_carousel": {
+        "label": "📸 Instagram Carousel",
+        "description": "เหมาะสำหรับสไลด์คอนเทนต์ปัดข้างสำหรับลง Instagram หรือ LinkedIn",
+        "form_fields": [
+            "topic",
+            "keyword",
+            "target_audience",
+            "core_story",
+            "key_insight",
+            "tone",
+            "cta"
+        ],
+        "prompt_strategy": {
+            "role": "Instagram Copywriter & Visual Storyteller",
+            "focus": ["Visual Storytelling", "Instagram Carousel", "Hook", "Caption"],
+            "rules": [
+                "เขียนเนื้อหาสไลด์สำหรับ Instagram Carousel ทั้ง 6 สไลด์ให้สั้นกระชับ (ไม่เกิน 15-20 คำต่อสไลด์)",
+                "สไลด์ที่ 1 ต้องเป็น Hook ที่ดึงดูดสายตาอย่างแรงกล้า",
+                "สไลด์ที่ 2 อธิบายปัญหาหลัก (Problem), สไลด์ที่ 3 ข้อมูลเจาะลึก (Insight), สไลด์ที่ 4 ทางออก (Solution), สไลด์ที่ 5 ผลประโยชน์ที่ได้รับ (Benefit), สไลด์ที่ 6 ชวนแชร์/คลิกลิงก์ (CTA)",
+                "เขียนแคปชั่นหลัก (Caption) 100-200 คำ ให้อธิบายเจาะลึกขยายความประเด็นในสไลด์อย่างน่าดึงดูด",
+                "จัดข้อความสไลด์และแคปชั่นแยกจากกันอย่างชัดเจนและอ่านง่ายบนมือถือ"
+            ]
+        },
+        "outputs": {
+            "seo_article": "📸 Instagram Slides (1-6)",
+            "facebook_post": "📝 IG Caption & Hashtags",
+            "tiktok_script": "🎵 TikTok Script",
+            "youtube_script": "🔴 YouTube Shorts",
+            "image_prompt": "🎨 Carousel Cover Prompt"
+        }
     }
 }

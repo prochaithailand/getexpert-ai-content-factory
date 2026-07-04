@@ -762,6 +762,17 @@ if is_demo:
                         blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น กระแสเงินสดสำคัญกว่ากำไรทางบัญชีเสมอ")
                         blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องแบบภาพยนตร์ จริงใจ เป็นธรรมชาติ ถ่อมตัวแต่มีความรู้")
                         blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น กดแชร์แบ่งปันบทเรียนนี้ หรือลงทะเบียนรับข่าวสารรายสัปดาห์")
+                        
+                    elif selected_content_type == "instagram_carousel":
+                        topic = st.text_input("หัวข้อสไลด์หลัก *", placeholder="3 นิสัยทำลายการเงินของคนรุ่นใหม่")
+                        keyword = st.text_input("คำค้นหาหลัก *", placeholder="การเงินส่วนบุคคล, วิธีเก็บเงิน")
+                        st.write("---")
+                        st.markdown("**📸 ข้อมูลสไลด์ Instagram Carousel (Visual Context)**")
+                        blueprint_inputs["target_audience"] = st.text_input("กลุ่มเป้าหมายผู้รับชม", placeholder="เช่น พนักงานจบใหม่และวัยเริ่มต้นทำงานช่วงอายุ 22-26 ปี")
+                        blueprint_inputs["core_story"] = st.text_input("แกนเรื่องเล่าที่ใช้โยงประเด็น", placeholder="เช่น จากคนที่เงินเดือนหมดตั้งแต่สัปดาห์ที่สองของเดือนจนต้องเริ่มเปลี่ยนตัวเอง")
+                        blueprint_inputs["key_insight"] = st.text_input("ข้อมูลเจาะลึกที่คนทั่วไปมักเข้าใจผิด", placeholder="เช่น เงินออมไม่ได้ขึ้นอยู่กับจำนวนเงินที่หาได้ แต่ขึ้นอยู่กับการควบคุมค่าใช้จ่ายคงที่")
+                        blueprint_inputs["tone"] = st.text_input("สไตล์น้ำเสียง", placeholder="เช่น เป็นกันเอง เข้าใจง่าย สดใหม่เหมือนคุยกับรุ่นพี่ที่หวังดี")
+                        blueprint_inputs["cta"] = st.text_input("ข้อความปิดท้ายเชิญชวน (CTA)", placeholder="เช่น กดเซฟเก็บไว้ทบทวน หรือแชร์เตือนใจเพื่อนใกล้ตัวคุณ")
 
                     submitted = st.form_submit_button("✨ สร้าง Content Pack", disabled=st.session_state.get('is_processing', False))
                 
@@ -1188,6 +1199,17 @@ else:
                     blueprint_inputs["key_takeaway"] = st.text_input("ข้อความหลักที่อยากให้คนจดจำ", placeholder="เช่น การปัดปฏิเสธงานไม่สำคัญคือทักษะการเพิ่มผลิตภาพที่แท้จริง")
                     blueprint_inputs["tone"] = st.text_input("สไตล์การเขียน", placeholder="เช่น เล่าเรื่องผ่านตัวคุณ เป็นกันเองจริงใจ มีความสุภาพแต่น่าฟัง")
                     blueprint_inputs["cta"] = st.text_input("คำเชิญชวนดำเนินการ (CTA)", placeholder="เช่น กดแชร์หากคุณคิดเหมือนกัน หรือทักเรามาใต้คอมเมนต์เพื่อแลกไอเดีย")
+                    
+                elif selected_content_type == "instagram_carousel":
+                    topic = st.text_input("หัวข้อสไลด์หลัก *", placeholder="3 นิสัยทำลายการเงินของคนรุ่นใหม่")
+                    keyword = st.text_input("คำค้นหาหลัก *", placeholder="การเงินส่วนบุคคล, วิธีเก็บเงิน")
+                    st.write("---")
+                    st.markdown("**📸 ข้อมูลสไลด์ Instagram Carousel (Visual Context)**")
+                    blueprint_inputs["target_audience"] = st.text_input("กลุ่มเป้าหมายผู้รับชม", placeholder="เช่น พนักงานจบใหม่และวัยเริ่มต้นทำงานช่วงอายุ 22-26 ปี")
+                    blueprint_inputs["core_story"] = st.text_input("แกนเรื่องเล่าที่ใช้โยงประเด็น", placeholder="เช่น จากคนที่เงินเดือนหมดตั้งแต่สัปดาห์ที่สองของเดือนจนต้องเริ่มเปลี่ยนตัวเอง")
+                    blueprint_inputs["key_insight"] = st.text_input("ข้อมูลเจาะลึกที่คนทั่วไปมักเข้าใจผิด", placeholder="เช่น เงินออมไม่ได้ขึ้นอยู่กับจำนวนเงินที่หาได้ แต่ขึ้นอยู่กับการควบคุมค่าใช้จ่ายคงที่")
+                    blueprint_inputs["tone"] = st.text_input("สไตล์น้ำเสียง", placeholder="เช่น เป็นกันเอง เข้าใจง่าย สดใหม่เหมือนคุยกับรุ่นพี่ที่หวังดี")
+                    blueprint_inputs["cta"] = st.text_input("ข้อความปิดท้ายเชิญชวน (CTA)", placeholder="เช่น กดเซฟเก็บไว้ทบทวน หรือแชร์เตือนใจเพื่อนใกล้ตัวคุณ")
                 submitted = st.form_submit_button("ส่งคำขอเขียนและแพ็คคอนเทนต์ (Add to Queue)", disabled=st.session_state.get('is_processing', False))
                 
                 if submitted:

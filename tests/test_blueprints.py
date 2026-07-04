@@ -192,5 +192,16 @@ class TestAIContentBlueprints(unittest.TestCase):
         self.assertNotIn("#ลดราคา", sp.facebook_hashtags)
         self.assertNotIn("<strong>", "".join(sp.facebook_hashtags))
 
+    def test_instagram_carousel_blueprint(self):
+        """
+        ทดสอบโครงสร้างและการดึงข้อมูลของ Instagram Carousel Blueprint (Sprint 16)
+        """
+        bp = BlueprintService.get_blueprint("instagram_carousel")
+        self.assertEqual(bp["label"], "📸 Instagram Carousel")
+        self.assertIn("core_story", bp["form_fields"])
+        self.assertIn("key_insight", bp["form_fields"])
+        self.assertEqual(bp["outputs"]["seo_article"], "📸 Instagram Slides (1-6)")
+        self.assertEqual(bp["outputs"]["facebook_post"], "📝 IG Caption & Hashtags")
+
 if __name__ == "__main__":
     unittest.main()
