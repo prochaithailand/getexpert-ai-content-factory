@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # 1. Customer facing Web Application (Streamlit App)
+  app:
+    build: .
+    container_name: getexpert-streamlit-app
+    restart: always
+    ports:
+      - "127.0.0.1:8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+
+  # 2. Background Queue processing engine (main.py Runner)
+  worker:
+    build: .
+    container_name: getexpert-queue-worker
+    restart: always
+    command: ["python", "main.py"]
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
