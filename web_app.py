@@ -553,7 +553,7 @@ if is_demo:
     # DEMO MODE (Client Trial - คลีนและรันตอบสนองทันที - UX Sprint 1 / Sprint 5)
     # ----------------------------------------------------
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
-    st.info("🎁 ทดลองใช้ฟรี 3 Content Packs / หลังจากนั้นเริ่มต้นเพียง 99 บาท ได้ 10 Content Credits (1 Credit = สร้างครบชุด 1 ครั้ง)")
+    st.info("🎁 ทดลองใช้ฟรี 3 Content Packs")
     if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
         st.caption(f"👋 คุณเข้าใช้งานผ่านลิงก์ผู้แนะนำ: **{st.session_state['referred_by_code']}**")
 
@@ -561,7 +561,7 @@ if is_demo:
     st.markdown("""
     <div style='text-align: center; padding: 20px 0 10px 0;'>
         <h1 style='font-size: 2.6em; font-weight: 800; color: #1e293b; margin-bottom: 12px; line-height: 1.25;'>
-            🚀 เปลี่ยน 1 หัวข้อ เป็นคอนเทนต์ครบทุกช่องทางด้วย AI
+            ✨ เปลี่ยน 1 หัวข้อ เป็นคอนเทนต์ครบทุกช่องทางด้วย AI
         </h1>
         <p style='font-size: 1.2em; color: #64748b; font-weight: 400; margin-bottom: 25px; max-width: 800px; margin-left: auto; margin-right: auto;'>
             สร้างแผนยุทธศาสตร์เนื้อหา บทความ SEO และโซเชียลสคริปต์ที่ตรงบริบทองค์กรของคุณทันที
@@ -1013,7 +1013,7 @@ else:
     # STANDARD MODE (Admin Portal - เมนูจัดการหลังบ้านเดิม)
     # ----------------------------------------------------
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
-    st.info("🎁 ทดลองใช้ฟรี 3 Content Packs / หลังจากนั้นเริ่มต้นเพียง 99 บาท ได้ 10 Content Credits (1 Credit = สร้างครบชุด 1 ครั้ง)")
+    st.info("🎁 ทดลองใช้ฟรี 3 Content Packs")
     if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
         st.caption(f"👋 คุณเข้าใช้งานผ่านลิงก์ผู้แนะนำ: **{st.session_state['referred_by_code']}**")
 
