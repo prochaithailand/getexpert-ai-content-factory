@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Step 4.5: Inject Google Tag Manager (GTM) into Streamlit templates (GTM integration)
+COPY patch_streamlit.py .
+RUN python patch_streamlit.py
+
 # Step 5: Copy the rest of application code
 COPY . .
 
