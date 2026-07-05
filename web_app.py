@@ -139,7 +139,7 @@ def show_payment_gate():
         unsafe_allow_html=True
     )
 
-    st.markdown(f'<a href="{line_oa_url}" target="_blank" onclick="window.parent.dataLayer = window.parent.dataLayer || []; window.parent.dataLayer.push({{\\'event\\': \\'buy_credit_click\\'}}); window.parent.dataLayer.push({{\\'event\\': \\'payment_line_click\\'}});" style="color:#007bff; text-decoration:underline;">เปิด LINE OA สำรอง</a>', unsafe_allow_html=True)
+    st.markdown(f"""<a href="{line_oa_url}" target="_blank" style="color:#007bff; text-decoration:underline;">เปิด LINE OA สำรอง</a>""", unsafe_allow_html=True)
 
     st.markdown(f"""
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px; margin-bottom: 10px;">
