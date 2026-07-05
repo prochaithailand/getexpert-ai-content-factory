@@ -23,3 +23,14 @@ services:
       - .env
     volumes:
       - ./logs:/app/logs
+
+  # 3. Temporary LINE Webhook Debug server
+  webhook:
+    build: .
+    container_name: getexpert-webhook-receiver
+    restart: always
+    command: ["python", "line_webhook.py"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./logs:/app/logs
