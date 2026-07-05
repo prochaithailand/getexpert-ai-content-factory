@@ -11,6 +11,7 @@ from services.blogger_service import BloggerService
 from services.blueprint_service import BlueprintService
 from utils.sanitize import strip_html_tags
 from utils.gtm import push_event_to_gtm
+from services.notification_service import NotificationService
 
 # กำหนดหน้าจอหลักของ Streamlit
 st.set_page_config(
@@ -19,6 +20,31 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Handle custom redirect actions for GTM/LINE OA event tracking (CEO Notification Phase 1)
+try:
+    query_params = st.query_params
+    if "action" in query_params:
+        action = query_params["action"]
+        email = query_params.get("email", "unknown@getexpert.biz")
+        
+        # Trigger LINE notifications
+        if action == "buy_credit":
+            NotificationService.send_event_notification("buy_credit_click", email)
+            NotificationService.send_event_notification("payment_line_click", email)
+            
+        # Perform client-side redirect to LINE OA
+        st.components.v1.html(
+            """
+            <script>
+            window.parent.location.href = "https://lin.ee/TZgX4CD";
+            </script>
+            """,
+            height=0, width=0
+        )
+        st.stop()
+except Exception as e:
+    logging.warning(f"Error handling query parameter action redirect: {e}")
 
 # สไตล์ CSS เพิ่มเติมเพื่อความพรีเมียม
 st.markdown("""
@@ -82,10 +108,13 @@ def get_credit_service():
     from services.credit_service import CreditService
     return CreditService(sheets_service)
 
-def show_payment_gate():
+def show_payment_gate(user_email=None):
     """
     แสดงหน้าจอ Payment Gate เมื่อผู้ใช้งานใช้สิทธิ์เครดิตหมด (Sprint 6)
     """
+    if not user_email:
+        user_email = st.session_state.get('demo_credit_checked_email') or st.session_state.get('std_credit_checked_email') or 'unknown@getexpert.biz'
+        
     st.markdown("""
     ### 💳 คุณใช้สิทธิ์ทดลองใช้ฟรีครบ 3 Content Packs แล้ว
     
@@ -116,11 +145,11 @@ def show_payment_gate():
     4. Admin จะตรวจสอบและเติมเครดิตให้ในระบบ
     """)
 
-    line_oa_url = "https://lin.ee/TZgX4CD"
+    line_oa_redirect_url = f"/?action=buy_credit&email={user_email}"
     
     st.markdown(
         f"""
-        <a href="{line_oa_url}" target="_blank" onclick="window.parent.dataLayer = window.parent.dataLayer || []; window.parent.dataLayer.push({{'event': 'buy_credit_click'}}); window.parent.dataLayer.push({{'event': 'payment_line_click'}});" style="
+        <a href="{line_oa_redirect_url}" target="_blank" onclick="window.parent.dataLayer = window.parent.dataLayer || []; window.parent.dataLayer.push({{'event': 'buy_credit_click'}}); window.parent.dataLayer.push({{'event': 'payment_line_click'}});" style="
             display:block;
             text-align:center;
             background:#06C755;
@@ -139,7 +168,7 @@ def show_payment_gate():
         unsafe_allow_html=True
     )
 
-    st.markdown(f"""<a href="{line_oa_url}" target="_blank" style="color:#007bff; text-decoration:underline;">เปิด LINE OA สำรอง</a>""", unsafe_allow_html=True)
+    st.markdown(f"""<a href="{line_oa_redirect_url}" target="_blank" onclick="window.parent.dataLayer = window.parent.dataLayer || []; window.parent.dataLayer.push({{'event': 'buy_credit_click'}}); window.parent.dataLayer.push({{'event': 'payment_line_click'}});" style="color:#007bff; text-decoration:underline;">เปิด LINE OA สำรอง</a>""", unsafe_allow_html=True)
 
     st.markdown(f"""
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px; margin-bottom: 10px;">
@@ -466,6 +495,14 @@ def show_admin_referral_manager():
                             "credits_added": credits_to_add
                         })
                         
+                        # LINE Notification account_activated integration
+                        NotificationService.send_event_notification(
+                            "account_activated",
+                            user.user_email,
+                            package_name=selected_pkg_name,
+                            credits=user.paid_credits_balance
+                        )
+                        
                         # 3. คำนวณคอมมิชชั่น 20 บาท หากผู้ใช้นี้มีผู้แนะนำ (Referred By)
                         # จ่ายเฉพาะเมื่อลูกค้าชำระเงินแพ็กเกจปกติ (คอมมิชชั่นชั้นเดียว)
                         commission_logged = ""
@@ -647,6 +684,7 @@ if is_demo:
                     
                     if is_new_user:
                         push_event_to_gtm("signup_complete", {"user_mode": "demo"})
+                        NotificationService.send_event_notification("signup_complete", user_email)
                 except Exception as e:
                     st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
                     st.session_state['demo_is_eligible'] = False
@@ -697,7 +735,7 @@ if is_demo:
         elif not is_eligible:
             # แสดงหน้าจอ Payment Gate แทนตัวฟอร์ม (Sprint 6)
             with st.container(border=True):
-                show_payment_gate()
+                show_payment_gate(user_email)
         else:
             with st.container(border=True):
                 st.subheader("💡 ป้อนรายละเอียดตามบลูปริ้นต์")
@@ -819,6 +857,16 @@ if is_demo:
                             "content_pack_type": selected_content_type,
                             "credits_remaining": credit_balance
                         })
+                        
+                        # LINE Notification on first generate_content
+                        demo_user_obj = st.session_state.get('demo_user_credit_obj')
+                        if demo_user_obj and demo_user_obj.total_generated == 0:
+                            NotificationService.send_event_notification(
+                                "first generate_content",
+                                user_email,
+                                package_name=selected_content_type,
+                                credits=credit_balance
+                            )
                         
                         try:
                             # รันประมวลผลแบบ Synchronous พร้อม st.status ลิสต์ทีละขั้นตอน
@@ -1119,6 +1167,7 @@ else:
                     
                     if is_new_user:
                         push_event_to_gtm("signup_complete", {"user_mode": "standard"})
+                        NotificationService.send_event_notification("signup_complete", user_email)
                 except Exception as e:
                     st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
                     st.session_state['std_is_eligible'] = False
@@ -1168,7 +1217,7 @@ else:
         elif not is_eligible:
             # แสดงหน้าจอ Payment Gate แทนตัวฟอร์ม (Sprint 6)
             with st.container(border=True):
-                show_payment_gate()
+                show_payment_gate(user_email)
         else:
             with st.container(border=True):
                 st.subheader("📝 ป้อนรายละเอียดตามบลูปริ้นต์")
@@ -1288,6 +1337,16 @@ else:
                             "content_pack_type": selected_content_type,
                             "credits_remaining": credit_balance
                         })
+                        
+                        # LINE Notification on first generate_content
+                        std_user_obj = st.session_state.get('std_user_credit_obj')
+                        if std_user_obj and std_user_obj.total_generated == 0:
+                            NotificationService.send_event_notification(
+                                "first generate_content",
+                                user_email,
+                                package_name=selected_content_type,
+                                credits=credit_balance
+                            )
                         
                         try:
                             # บันทึกข้อมูลแผนงานบลูปริ้นต์ลงชีตในระบบคิวงานรอรันรายวัน

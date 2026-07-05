@@ -41,6 +41,10 @@ class Settings:
     # Logging Configuration
     LOG_LEVEL = get_secret_or_env("LOG_LEVEL", "INFO")
 
+    # LINE Messaging API Configuration
+    LINE_CHANNEL_ACCESS_TOKEN = get_secret_or_env("LINE_CHANNEL_ACCESS_TOKEN")
+    LINE_USER_ID = get_secret_or_env("LINE_USER_ID")
+
     @classmethod
     def validate(cls):
         """
