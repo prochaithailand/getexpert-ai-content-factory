@@ -10,6 +10,7 @@ from services.gemini_service import GeminiService
 from services.blogger_service import BloggerService
 from services.blueprint_service import BlueprintService
 from utils.sanitize import strip_html_tags
+from utils.gtm import push_event_to_gtm
 
 # กำหนดหน้าจอหลักของ Streamlit
 st.set_page_config(
@@ -119,7 +120,7 @@ def show_payment_gate():
     
     st.markdown(
         f"""
-        <a href="{line_oa_url}" target="_self" style="
+        <a href="{line_oa_url}" target="_blank" onclick="window.parent.dataLayer = window.parent.dataLayer || []; window.parent.dataLayer.push({{'event': 'buy_credit_click'}}); window.parent.dataLayer.push({{'event': 'payment_line_click'}});" style="
             display:block;
             text-align:center;
             background:#06C755;
@@ -138,7 +139,7 @@ def show_payment_gate():
         unsafe_allow_html=True
     )
 
-    st.markdown(f"[เปิด LINE OA สำรอง]({line_oa_url})")
+    st.markdown(f'<a href="{line_oa_url}" target="_blank" onclick="window.parent.dataLayer = window.parent.dataLayer || []; window.parent.dataLayer.push({{\\'event\\': \\'buy_credit_click\\'}}); window.parent.dataLayer.push({{\\'event\\': \\'payment_line_click\\'}});" style="color:#007bff; text-decoration:underline;">เปิด LINE OA สำรอง</a>', unsafe_allow_html=True)
 
     st.markdown(f"""
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px; margin-bottom: 10px;">
@@ -458,6 +459,13 @@ def show_admin_referral_manager():
                         )
                         sheets_service.add_payment_record(payment)
                         
+                        # GTM account_activated integration
+                        push_event_to_gtm("account_activated", {
+                            "user_mode": "admin",
+                            "package_name": selected_pkg_name,
+                            "credits_added": credits_to_add
+                        })
+                        
                         # 3. คำนวณคอมมิชชั่น 20 บาท หากผู้ใช้นี้มีผู้แนะนำ (Referred By)
                         # จ่ายเฉพาะเมื่อลูกค้าชำระเงินแพ็กเกจปกติ (คอมมิชชั่นชั้นเดียว)
                         commission_logged = ""
@@ -552,6 +560,11 @@ if is_demo:
     # ----------------------------------------------------
     # DEMO MODE (Client Trial - คลีนและรันตอบสนองทันที - UX Sprint 1 / Sprint 5)
     # ----------------------------------------------------
+    # GTM demo_start integration
+    if "gtm_demo_start_sent" not in st.session_state:
+        push_event_to_gtm("demo_start", {"user_mode": "demo"})
+        st.session_state["gtm_demo_start_sent"] = True
+
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
     st.info("🎁 ทดลองใช้ฟรี 3 Content Packs")
     if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
@@ -613,7 +626,14 @@ if is_demo:
         if st.button("🔍 ตรวจสอบเครดิตและสิทธิ์ใช้งาน", key="demo_verify_credit_btn"):
             with st.spinner("กำลังเชื่อมต่อระบบฐานข้อมูลเครดิต..."):
                 try:
+                    # GTM signup_complete integration: Check if user exists before get_or_create_user
+                    is_new_user = False
                     credit_service = get_credit_service()
+                    if credit_service.sheets_service:
+                        existing_user = credit_service.sheets_service.get_user_by_email(user_email.strip().lower())
+                        if not existing_user:
+                            is_new_user = True
+
                     user = credit_service.get_or_create_user(user_email, user_name, referred_by=st.session_state.get("referred_by_code", ""))
                     st.session_state['demo_user_credit_obj'] = user
                     eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
@@ -624,6 +644,9 @@ if is_demo:
                     st.session_state['demo_status_msg'] = c_msg
                     st.session_state['demo_credit_checked_email'] = user_email
                     st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                    
+                    if is_new_user:
+                        push_event_to_gtm("signup_complete", {"user_mode": "demo"})
                 except Exception as e:
                     st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
                     st.session_state['demo_is_eligible'] = False
@@ -789,6 +812,14 @@ if is_demo:
                         # ล็อกกันกดซ้ำ
                         st.session_state['is_processing'] = True
                         
+                        # GTM generate_content integration
+                        push_event_to_gtm("generate_content", {
+                            "user_mode": "demo",
+                            "blueprint_type": selected_content_type,
+                            "content_pack_type": selected_content_type,
+                            "credits_remaining": credit_balance
+                        })
+                        
                         try:
                             # รันประมวลผลแบบ Synchronous พร้อม st.status ลิสต์ทีละขั้นตอน
                             with st.status("🧠 วิเคราะห์ยุทธศาสตร์และหัวข้อ...", expanded=True) as status_box:
@@ -872,6 +903,22 @@ if is_demo:
                                     content_type=selected_content_type,
                                     blueprint_label=blueprint_label
                                 )
+                                
+                                # GTM trial_used / trial_finished integration
+                                if credit_type == "free":
+                                    updated_user = credit_service.get_or_create_user(user_email, user_name)
+                                    push_event_to_gtm("trial_used", {
+                                        "user_mode": "demo",
+                                        "blueprint_type": selected_content_type,
+                                        "content_pack_type": selected_content_type,
+                                        "credits_remaining": 3 - updated_user.free_credits_used
+                                    })
+                                    if updated_user.free_credits_used >= 3:
+                                        push_event_to_gtm("trial_finished", {
+                                            "user_mode": "demo",
+                                            "blueprint_type": selected_content_type,
+                                            "content_pack_type": selected_content_type
+                                        })
                                 
                                 status_box.update(label="✅ Content Pack พร้อมใช้งาน", state="complete", expanded=False)
                             
@@ -1051,7 +1098,14 @@ else:
         if st.button("🔍 ตรวจสอบเครดิตและสิทธิ์ใช้งาน", key="std_verify_credit_btn"):
             with st.spinner("กำลังเชื่อมต่อระบบฐานข้อมูลเครดิต..."):
                 try:
+                    # GTM signup_complete integration: Check if user exists before get_or_create_user
+                    is_new_user = False
                     credit_service = get_credit_service()
+                    if credit_service.sheets_service:
+                        existing_user = credit_service.sheets_service.get_user_by_email(user_email.strip().lower())
+                        if not existing_user:
+                            is_new_user = True
+
                     user = credit_service.get_or_create_user(user_email, user_name, referred_by=st.session_state.get("referred_by_code", ""))
                     st.session_state['std_user_credit_obj'] = user
                     eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
@@ -1062,6 +1116,9 @@ else:
                     st.session_state['std_status_msg'] = c_msg
                     st.session_state['std_credit_checked_email'] = user_email
                     st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                    
+                    if is_new_user:
+                        push_event_to_gtm("signup_complete", {"user_mode": "standard"})
                 except Exception as e:
                     st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
                     st.session_state['std_is_eligible'] = False
@@ -1223,6 +1280,15 @@ else:
                         st.error("โควตาเครดิตไม่เพียงพอ กรุณาติดต่อชำระเงินซื้อเครดิต")
                     else:
                         st.session_state['is_processing'] = True
+                        
+                        # GTM generate_content integration
+                        push_event_to_gtm("generate_content", {
+                            "user_mode": "standard",
+                            "blueprint_type": selected_content_type,
+                            "content_pack_type": selected_content_type,
+                            "credits_remaining": credit_balance
+                        })
+                        
                         try:
                             # บันทึกข้อมูลแผนงานบลูปริ้นต์ลงชีตในระบบคิวงานรอรันรายวัน
                             blueprint_label = blueprints_data[selected_content_type]["label"]
