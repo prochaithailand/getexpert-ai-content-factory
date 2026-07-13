@@ -23,6 +23,21 @@ class Settings:
     GEMINI_API_KEY = get_secret_or_env("GEMINI_API_KEY")
     GEMINI_MODEL = get_secret_or_env("GEMINI_MODEL", "gemini-2.5-flash")
 
+    # AI Provider Configuration
+    AI_PROVIDER = get_secret_or_env("AI_PROVIDER", "gemini_api_key")
+
+    # OpenAI Configuration
+    OPENAI_API_KEY = get_secret_or_env("OPENAI_API_KEY")
+    OPENAI_MODEL = get_secret_or_env("OPENAI_MODEL", "gpt-4o-mini")
+    OPENAI_MODEL_HIGH_QUALITY = get_secret_or_env("OPENAI_MODEL_HIGH_QUALITY", "gpt-4o")
+
+    # Vertex AI / Service Account Configuration
+    GEMINI_USE_VERTEX = get_secret_or_env("GEMINI_USE_VERTEX", "false").lower() in ("true", "1")
+    VERTEX_PROJECT = get_secret_or_env("VERTEX_PROJECT")
+    VERTEX_LOCATION = get_secret_or_env("VERTEX_LOCATION", "us-central1")
+    VERTEX_CREDENTIALS_JSON = get_secret_or_env("VERTEX_CREDENTIALS_JSON")
+    VERTEX_CREDENTIALS_FILE = get_secret_or_env("VERTEX_CREDENTIALS_FILE", "service_account.json")
+
     # Google Sheets Configuration
     GOOGLE_SHEET_ID = get_secret_or_env("GOOGLE_SHEET_ID")
     GOOGLE_SHEET_NAME = get_secret_or_env("GOOGLE_SHEET_NAME", "Sheet1")
@@ -51,8 +66,18 @@ class Settings:
         ตรวจสอบตัวแปรที่สำคัญว่าถูกกรอกครบถ้วนแล้วหรือยัง
         """
         missing = []
-        if not cls.GEMINI_API_KEY:
-            missing.append("GEMINI_API_KEY")
+        
+        provider = cls.AI_PROVIDER
+        if provider == "openai":
+            if not cls.OPENAI_API_KEY:
+                missing.append("OPENAI_API_KEY")
+        elif provider == "gemini_vertex" or (not provider and cls.GEMINI_USE_VERTEX):
+            if not cls.VERTEX_PROJECT:
+                missing.append("VERTEX_PROJECT")
+        else:
+            if not cls.GEMINI_API_KEY:
+                missing.append("GEMINI_API_KEY")
+                
         if not cls.GOOGLE_SHEET_ID:
             missing.append("GOOGLE_SHEET_ID")
         if not cls.BLOGGER_BLOG_ID:

@@ -12,11 +12,65 @@ class GeminiService:
     เซอร์วิสการจัดการเชื่อมต่อและทำงานร่วมกับ Gemini API
     """
     def __init__(self):
-        self.api_key = Settings.GEMINI_API_KEY
         self.model_name = Settings.GEMINI_MODEL
-        if not self.api_key:
-            raise ValueError("กรุณาระบุ GEMINI_API_KEY ในไฟล์ .env")
-        self.client = genai.Client(api_key=self.api_key)
+        
+        # 1. OpenAI Fallback Provider
+        if Settings.AI_PROVIDER == "openai":
+            logging.info("ระบบเริ่มต้นใช้งานด้วย OpenAI Fallback Provider")
+            return
+            
+        # 2. Vertex AI (Enterprise Mode)
+        if Settings.AI_PROVIDER == "gemini_vertex" or (not Settings.AI_PROVIDER and Settings.GEMINI_USE_VERTEX):
+            project = Settings.VERTEX_PROJECT
+            location = Settings.VERTEX_LOCATION
+            credentials_json = Settings.VERTEX_CREDENTIALS_JSON
+            credentials_file = Settings.VERTEX_CREDENTIALS_FILE
+            
+            credentials = None
+            scopes = ['https://www.googleapis.com/auth/cloud-platform']
+            
+            # โหลดจาก JSON String
+            if credentials_json:
+                import json
+                from google.oauth2 import service_account
+                try:
+                    info = json.loads(credentials_json)
+                    credentials = service_account.Credentials.from_service_account_info(
+                        info,
+                        scopes=scopes
+                    )
+                    logging.info("โหลด Service Account Credentials จาก JSON String ใน env สำเร็จ")
+                except Exception as e:
+                    logging.error(f"โหลด Service Account Credentials จาก JSON String ล้มเหลว: {e}")
+            
+            # โหลดจาก JSON File
+            elif credentials_file:
+                import os
+                from google.oauth2 import service_account
+                if os.path.exists(credentials_file):
+                    try:
+                        credentials = service_account.Credentials.from_service_account_file(
+                            credentials_file,
+                            scopes=scopes
+                        )
+                        logging.info(f"โหลด Service Account Credentials จากไฟล์ '{credentials_file}' สำเร็จ")
+                    except Exception as e:
+                        logging.error(f"โหลด Service Account Credentials จากไฟล์ '{credentials_file}' ล้มเหลว: {e}")
+            
+            self.client = genai.Client(
+                vertexai=True,
+                project=project,
+                location=location,
+                credentials=credentials
+            )
+            logging.info(f"เริ่มต้นการเชื่อมต่อ Gemini ผ่าน Vertex AI (Project: {project}, Location: {location})")
+        else:
+            # 3. Developer API (standard API key / new Auth key)
+            self.api_key = Settings.GEMINI_API_KEY
+            if not self.api_key:
+                raise ValueError("กรุณาระบุ GEMINI_API_KEY ในไฟล์ .env")
+            self.client = genai.Client(api_key=self.api_key)
+            logging.info("เริ่มต้นการเชื่อมต่อ Gemini ผ่าน Developer API Key")
 
     @retry(max_retries=3, delays=[2, 5, 10])
     def generate_blogger_article(
@@ -70,24 +124,58 @@ class GeminiService:
             output_labels_str=output_labels_str
         )
         
-        logging.info(f"กำลังส่งสัญญาณเรียกเขียนบทความไปยัง Gemini Model: '{self.model_name}' (ประเภทบลูปริ้นต์: {content_type})...")
-        
         try:
-            # ยิงเรียก Gemini API พร้อมบีบบังคับโครงสร้างการตอบกลับผ่าน Pydantic Model (SEOContent)
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=SEOContent,
-                ),
-            )
-            
-            result_json = response.text
-            logging.info("Gemini API เขียนบทความประมวลผลเสร็จสิ้นและส่งข้อมูลกลับมา")
-            
-            # ถอดรหัสโครงสร้าง
-            seo_content = SEOContent.model_validate_json(result_json)
+            if Settings.AI_PROVIDER == "openai":
+                logging.info(f"กำลังส่งสัญญาณเรียกเขียนบทความไปยัง OpenAI Model: '{Settings.OPENAI_MODEL_HIGH_QUALITY}' (ประเภทบลูปริ้นต์: {content_type})...")
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=Settings.OPENAI_API_KEY)
+                completion = openai_client.beta.chat.completions.parse(
+                    model=Settings.OPENAI_MODEL_HIGH_QUALITY,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format=SEOContent,
+                )
+                logging.info("OpenAI API เขียนบทความประมวลผลเสร็จสิ้นและส่งข้อมูลกลับมา")
+                seo_content = completion.choices[0].message.parsed
+                if not seo_content:
+                    raise Exception("OpenAI ไม่คืนผลลัพธ์ในรูปแบบโครงสร้างที่กำหนด")
+            else:
+                try:
+                    logging.info(f"กำลังส่งสัญญาณเรียกเขียนบทความไปยัง Gemini Model: '{self.model_name}' (ประเภทบลูปริ้นต์: {content_type})...")
+                    # ยิงเรียก Gemini API พร้อมบีบบังคับโครงสร้างการตอบกลับผ่าน Pydantic Model (SEOContent)
+                    response = self.client.models.generate_content(
+                        model=self.model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=SEOContent,
+                        ),
+                    )
+                    
+                    result_json = response.text
+                    logging.info("Gemini API เขียนบทความประมวลผลเสร็จสิ้นและส่งข้อมูลกลับมา")
+                    
+                    # ถอดรหัสโครงสร้าง
+                    seo_content = SEOContent.model_validate_json(result_json)
+                except Exception as gemini_err:
+                    if Settings.OPENAI_API_KEY:
+                        logging.warning(f"การเรียกเขียนบทความผ่าน Gemini API ล้มเหลว: {gemini_err}. กำลังทำการ Fallback ไปยัง OpenAI...")
+                        from openai import OpenAI
+                        openai_client = OpenAI(api_key=Settings.OPENAI_API_KEY)
+                        completion = openai_client.beta.chat.completions.parse(
+                            model=Settings.OPENAI_MODEL_HIGH_QUALITY,
+                            messages=[
+                                {"role": "user", "content": prompt}
+                            ],
+                            response_format=SEOContent,
+                        )
+                        logging.info("OpenAI Fallback API เขียนบทความประมวลผลเสร็จสิ้น")
+                        seo_content = completion.choices[0].message.parsed
+                        if not seo_content:
+                            raise Exception("OpenAI Fallback ไม่คืนผลลัพธ์ในรูปแบบโครงสร้างที่กำหนด")
+                    else:
+                        raise gemini_err
             
             # ล้างแท็ก HTML ที่ต้นทางสำหรับข้อมูลข้อความทั้งหมด
             from utils.sanitize import strip_html_tags

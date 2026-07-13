@@ -99,10 +99,11 @@ class CreditService:
             email_clean = email.strip().lower()
             result = self.sheets_service.get_user_by_email(email_clean)
             if not result:
-                # ผู้ใช้ใหม่เอี่ยม ยังมีสิทธิ์ฟรี 3 ครั้ง
-                return True, "free", 3, "คุณได้รับสิทธิ์ทดลองใช้ฟรี 3 Content Packs"
+                return False, "blocked", 0, "ไม่พบข้อมูลเครดิตของอีเมลนี้ กรุณาติดต่อ LINE OA"
                 
             user, _ = result
+            if not user.user_email or not user.payment_status:
+                return False, "blocked", 0, "ไม่พบข้อมูลเครดิตของอีเมลนี้ กรุณาติดต่อ LINE OA"
             
             # เงื่อนไข 1: ใช้โควตาฟรีไม่ครบ 3 ครั้ง
             if user.free_credits_used < 3:
