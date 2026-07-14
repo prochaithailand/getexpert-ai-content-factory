@@ -10,7 +10,7 @@ class UserCredit(BaseModel):
     user_email: str = Field(description="อีเมลของผู้ใช้สำหรับจัดแยกโควตา")
     user_name: str = Field(description="ชื่อจริง / ชื่อในการแสดงผลของผู้ใช้")
     created_at: str = Field(description="วันที่ผู้ใช้นี้เข้าลงทะเบียนเริ่มระบบครั้งแรก")
-    free_credits_used: int = Field(default=0, description="จำนวนครั้งสร้างคอนเทนต์ฟรีที่ใช้ไปแล้ว (ลิมิตสูงสุด 3)")
+    free_credits_used: int = Field(default=0, description="จำนวนครั้งสร้างคอนเทนต์ฟรีที่ใช้ไปแล้ว (ลิมิตสูงสุด 1)")
     paid_credits_balance: int = Field(default=0, description="ยอดคงเหลือของเครดิตจ่ายเงินคงเหลือ")
     total_generated: int = Field(default=0, description="ยอดประมวลผลสะสมทั้งหมดที่สำเร็จ")
     payment_status: str = Field(default="Free Trial", description="สถานะโหมดชำระเงินของผู้ใช้ (เช่น Free Trial, Active Customer)")

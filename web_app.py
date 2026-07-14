@@ -116,7 +116,7 @@ def show_payment_gate(user_email=None):
         user_email = st.session_state.get('demo_credit_checked_email') or st.session_state.get('std_credit_checked_email') or 'unknown@getexpert.biz'
         
     st.markdown("""
-    ### 💳 คุณใช้สิทธิ์ทดลองใช้ฟรีครบ 3 Content Packs แล้ว
+    ### 💳 คุณใช้สิทธิ์ทดลองใช้ฟรีครบ 1 Content Pack แล้ว
     
     หากต้องการสร้างคอนเทนต์ต่อ
     ซื้อเครดิตเริ่มต้นเพียง **99 บาท**
@@ -604,7 +604,7 @@ if is_demo:
         st.session_state["gtm_demo_start_sent"] = True
 
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
-    st.info("🎁 ทดลองใช้ฟรี 3 Content Packs")
+    st.info("🎁 ทดลองใช้ฟรี 1 Content Pack")
     if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
         st.caption(f"👋 คุณเข้าใช้งานผ่านลิงก์ผู้แนะนำ: **{st.session_state['referred_by_code']}**")
 
@@ -1107,7 +1107,7 @@ else:
     # STANDARD MODE (Admin Portal - เมนูจัดการหลังบ้านเดิม)
     # ----------------------------------------------------
     # แสดงแบนเนอร์ด้านบนของหน้าเว็บ (Sprint 6)
-    st.info("🎁 ทดลองใช้ฟรี 3 Content Packs")
+    st.info("🎁 ทดลองใช้ฟรี 1 Content Pack")
     if "referred_by_code" in st.session_state and st.session_state["referred_by_code"]:
         st.caption(f"👋 คุณเข้าใช้งานผ่านลิงก์ผู้แนะนำ: **{st.session_state['referred_by_code']}**")
 
