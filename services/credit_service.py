@@ -105,10 +105,10 @@ class CreditService:
             if not user.user_email or not user.payment_status:
                 return False, "blocked", 0, "ไม่พบข้อมูลเครดิตของอีเมลนี้ กรุณาติดต่อ LINE OA"
             
-            # เงื่อนไข 1: ใช้โควตาฟรีไม่ครบ 3 ครั้ง
-            if user.free_credits_used < 3:
-                remaining_free = 3 - user.free_credits_used
-                return True, "free", remaining_free, f"คุณใช้สิทธิ์ฟรีไปแล้ว {user.free_credits_used} / 3 Content Packs"
+            # เงื่อนไข 1: ใช้โควตาฟรีไม่ครบ 1 ครั้ง
+            if user.free_credits_used < 1:
+                remaining_free = 1 - user.free_credits_used
+                return True, "free", remaining_free, f"คุณใช้สิทธิ์ฟรีไปแล้ว {user.free_credits_used} / 1 Content Pack"
                 
             # เงื่อนไข 2: ใช้ฟรีครบแล้วแต่มีเครดิตเสียเงินคงเหลือ
             if user.paid_credits_balance > 0:
@@ -136,10 +136,10 @@ class CreditService:
             user, row_idx = result
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            credits_before = 3 - user.free_credits_used if credit_type == "free" else user.paid_credits_balance
+            credits_before = 1 - user.free_credits_used if credit_type == "free" else user.paid_credits_balance
             
             if credit_type == "free":
-                if user.free_credits_used >= 3:
+                if user.free_credits_used >= 1:
                     return False, "สิทธิ์ทดลองใช้ฟรีของคุณหมดแล้ว"
                 user.free_credits_used += 1
             elif credit_type == "paid":
@@ -153,12 +153,12 @@ class CreditService:
             user.total_generated += 1
             user.last_generated_at = now_str
             user.updated_at = now_str
-            if user.free_credits_used >= 3 and user.paid_credits_balance == 0:
+            if user.free_credits_used >= 1 and user.paid_credits_balance == 0:
                 user.payment_status = "Credit Depleted"
             elif user.paid_credits_balance > 0:
                 user.payment_status = "Active Customer"
                 
-            credits_after = 3 - user.free_credits_used if credit_type == "free" else user.paid_credits_balance
+            credits_after = 1 - user.free_credits_used if credit_type == "free" else user.paid_credits_balance
             
             # 1. อัปเดตข้อมูลผู้ใช้งานลง Users Sheet
             self.sheets_service.save_user_credit(user, row_idx)
@@ -201,7 +201,7 @@ class CreditService:
             user, _ = result
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            credits_current = 3 - user.free_credits_used if credit_type == "free" else user.paid_credits_balance
+            credits_current = 1 - user.free_credits_used if credit_type == "free" else user.paid_credits_balance
             
             log = UsageLog(
                 timestamp=now_str,

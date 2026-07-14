@@ -8,7 +8,7 @@ from services.credit_service import CreditService
 class TestCreditGate(unittest.TestCase):
     def test_new_user_eligibility(self):
         """
-        ผู้ใช้ใหม่ต้องได้สิทธิ์ Free Trial จำนวน 3 ครั้ง
+        ผู้ใช้ใหม่เอี่ยมที่ยังไม่ได้สร้างบัญชีในชีต ต้องส่งคืนสิทธิ์เป็นบล็อกที่ระดับเซอร์วิสโดยลำพัง (จนกว่าจะมีการเรียกลงทะเบียนผ่าน get_or_create_user)
         """
         sheets_mock = MagicMock()
         sheets_mock.get_user_by_email.return_value = None  # ไม่เจอผู้ใช้ในชีต
@@ -16,25 +16,25 @@ class TestCreditGate(unittest.TestCase):
         credit_service = CreditService(sheets_service=sheets_mock)
         is_eligible, credit_type, balance, msg = credit_service.check_credit_eligibility("new_user@example.com")
         
-        self.assertTrue(is_eligible)
-        self.assertEqual(credit_type, "free")
-        self.assertEqual(balance, 3)
-        self.assertIn("ทดลองใช้ฟรี", msg)
+        self.assertFalse(is_eligible)
+        self.assertEqual(credit_type, "blocked")
+        self.assertEqual(balance, 0)
+        self.assertIn("ไม่พบข้อมูลเครดิต", msg)
 
     def test_existing_user_partial_free(self):
         """
-        ผู้ใช้ที่เคยสร้างฟรีไปบ้างแต่ยังไม่ครบ 3 ครั้ง
+        ผู้ใช้ที่มีสิทธิ์ทดลองใช้ฟรีและยังไม่เคยเจเนอเรทงาน (free_credits_used = 0)
         """
         sheets_mock = MagicMock()
         existing_user = UserCredit(
             user_email="partial@example.com",
             user_name="Test User",
             created_at="2026-07-03 00:00:00",
-            free_credits_used=1,  # ใช้ไป 1 เหลือ 2
+            free_credits_used=0,  # ใช้ไป 0 เหลือ 1
             paid_credits_balance=0,
-            total_generated=1,
+            total_generated=0,
             payment_status="Free Trial",
-            last_generated_at="2026-07-03 00:00:00",
+            last_generated_at="",
             updated_at="2026-07-03 00:00:00"
         )
         sheets_mock.get_user_by_email.return_value = (existing_user, 2)
@@ -44,21 +44,21 @@ class TestCreditGate(unittest.TestCase):
         
         self.assertTrue(is_eligible)
         self.assertEqual(credit_type, "free")
-        self.assertEqual(balance, 2)  # 3 - 1 = 2
-        self.assertIn("คุณใช้สิทธิ์ฟรีไปแล้ว 1 / 3", msg)
+        self.assertEqual(balance, 1)  # 1 - 0 = 1
+        self.assertIn("คุณใช้สิทธิ์ฟรีไปแล้ว 0 / 1", msg)
 
     def test_user_credits_depleted(self):
         """
-        ผู้ใช้ใช้สิทธิ์ฟรีครบ 3 และไม่มีเครดิตเติมเงินเหลือ
+        ผู้ใช้ใช้สิทธิ์ฟรีครบ 1 และไม่มีเครดิตเติมเงินเหลือ
         """
         sheets_mock = MagicMock()
         depleted_user = UserCredit(
             user_email="depleted@example.com",
             user_name="Test User",
             created_at="2026-07-03 00:00:00",
-            free_credits_used=3,
+            free_credits_used=1,
             paid_credits_balance=0,
-            total_generated=3,
+            total_generated=1,
             payment_status="Credit Depleted",
             last_generated_at="2026-07-03 00:00:00",
             updated_at="2026-07-03 00:00:00"
@@ -75,16 +75,16 @@ class TestCreditGate(unittest.TestCase):
 
     def test_user_paid_credits(self):
         """
-        ผู้ใช้ใช้ฟรีครบ 3 แล้ว แต่มีเครดิตเติมเงินคงเหลือ
+        ผู้ใช้ใช้ฟรีครบ 1 แล้ว แต่มีเครดิตเติมเงินคงเหลือ
         """
         sheets_mock = MagicMock()
         paid_user = UserCredit(
             user_email="buyer@example.com",
             user_name="Test User",
             created_at="2026-07-03 00:00:00",
-            free_credits_used=3,
+            free_credits_used=1,
             paid_credits_balance=5,  # เหลือเครดิตเติมเงิน 5 ครั้ง
-            total_generated=3,
+            total_generated=1,
             payment_status="Active Customer",
             last_generated_at="2026-07-03 00:00:00",
             updated_at="2026-07-03 00:00:00"
@@ -136,8 +136,8 @@ class TestCreditGate(unittest.TestCase):
         self.assertIsInstance(log_arg, UsageLog)
         self.assertEqual(log_arg.user_email, "consume_free@example.com")
         self.assertEqual(log_arg.credit_type_used, "free")
-        self.assertEqual(log_arg.credits_before, 3)
-        self.assertEqual(log_arg.credits_after, 2)
+        self.assertEqual(log_arg.credits_before, 1)
+        self.assertEqual(log_arg.credits_after, 0)
         self.assertEqual(log_arg.status, "Success")
 
     def test_consume_paid_credit(self):
@@ -149,9 +149,9 @@ class TestCreditGate(unittest.TestCase):
             user_email="consume_paid@example.com",
             user_name="Test User",
             created_at="2026-07-03 00:00:00",
-            free_credits_used=3,
+            free_credits_used=1,
             paid_credits_balance=10,
-            total_generated=3,
+            total_generated=1,
             payment_status="Active Customer",
             last_generated_at="",
             updated_at=""
@@ -169,7 +169,7 @@ class TestCreditGate(unittest.TestCase):
         
         self.assertTrue(success)
         self.assertEqual(user.paid_credits_balance, 9)
-        self.assertEqual(user.total_generated, 4)
+        self.assertEqual(user.total_generated, 2)
         sheets_mock.save_user_credit.assert_called_once()
         sheets_mock.add_usage_log.assert_called_once()
         
@@ -216,8 +216,8 @@ class TestCreditGate(unittest.TestCase):
         sheets_mock.add_usage_log.assert_called_once()
         log_arg = sheets_mock.add_usage_log.call_args[0][0]
         self.assertEqual(log_arg.user_email, "fail_user@example.com")
-        self.assertEqual(log_arg.credits_before, 3)
-        self.assertEqual(log_arg.credits_after, 3)
+        self.assertEqual(log_arg.credits_before, 1)
+        self.assertEqual(log_arg.credits_after, 1)
         self.assertIn("Failed:", log_arg.status)
         self.assertIn("Gemini rate limit error", log_arg.status)
 

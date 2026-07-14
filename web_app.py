@@ -388,7 +388,7 @@ def show_admin_referral_manager():
                 # แสดงสถานะเดิม
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.write(f"💳 **สิทธิ์ทดลองใช้ฟรีที่ใช้ไป:** {user.free_credits_used} / 3")
+                    st.write(f"💳 **สิทธิ์ทดลองใช้ฟรีที่ใช้ไป:** {user.free_credits_used} / 1")
                 with c2:
                     st.write(f"💎 **เครดิตจ่ายเงินคงเหลือ:** {user.paid_credits_balance}")
                 with c3:
@@ -668,25 +668,22 @@ if is_demo:
                     if not credit_service.sheets_service:
                         raise Exception("ไม่สามารถเชื่อมต่อ Google Sheets API ได้")
                         
-                    existing_user = credit_service.sheets_service.get_user_by_email(user_email.strip().lower())
-                    if not existing_user:
-                        st.session_state['demo_is_eligible'] = False
-                        st.session_state['demo_credit_type'] = "blocked"
-                        st.session_state['demo_credit_balance'] = 0
-                        st.session_state['demo_status_msg'] = "ไม่พบข้อมูลเครดิตของอีเมลนี้ กรุณาติดต่อ LINE OA"
-                        st.session_state['demo_credit_checked_email'] = user_email
-                    else:
-                        user = credit_service.get_or_create_user(user_email, user_name, referred_by=st.session_state.get("referred_by_code", ""))
-                        st.session_state['demo_user_credit_obj'] = user
-                        eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
-                        
-                        st.session_state['demo_is_eligible'] = eligible
-                        st.session_state['demo_credit_type'] = c_type
-                        st.session_state['demo_credit_balance'] = c_bal
-                        st.session_state['demo_status_msg'] = c_msg
-                        st.session_state['demo_credit_checked_email'] = user_email
-                        if eligible:
-                            st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                    email_clean = user_email.strip().lower()
+                    existing_user = credit_service.sheets_service.get_user_by_email(email_clean)
+                    is_new_user = not existing_user
+                    user = credit_service.get_or_create_user(email_clean, user_name, referred_by=st.session_state.get("referred_by_code", ""))
+                    st.session_state['demo_user_credit_obj'] = user
+                    eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(email_clean)
+                    st.session_state['demo_is_eligible'] = eligible
+                    st.session_state['demo_credit_type'] = c_type
+                    st.session_state['demo_credit_balance'] = c_bal
+                    st.session_state['demo_status_msg'] = c_msg
+                    st.session_state['demo_credit_checked_email'] = user_email
+                    if eligible:
+                        st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                        if is_new_user:
+                            push_event_to_gtm("signup_complete", {"user_mode": "demo"})
+                            NotificationService.send_event_notification("signup_complete", email_clean)
                 except Exception as e:
                     st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
                     st.session_state['demo_is_eligible'] = False
@@ -1152,25 +1149,22 @@ else:
                     if not credit_service.sheets_service:
                         raise Exception("ไม่สามารถเชื่อมต่อ Google Sheets API ได้")
                         
-                    existing_user = credit_service.sheets_service.get_user_by_email(user_email.strip().lower())
-                    if not existing_user:
-                        st.session_state['std_is_eligible'] = False
-                        st.session_state['std_credit_type'] = "blocked"
-                        st.session_state['std_credit_balance'] = 0
-                        st.session_state['std_status_msg'] = "ไม่พบข้อมูลเครดิตของอีเมลนี้ กรุณาติดต่อ LINE OA"
-                        st.session_state['std_credit_checked_email'] = user_email
-                    else:
-                        user = credit_service.get_or_create_user(user_email, user_name, referred_by=st.session_state.get("referred_by_code", ""))
-                        st.session_state['std_user_credit_obj'] = user
-                        eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(user_email)
-                        
-                        st.session_state['std_is_eligible'] = eligible
-                        st.session_state['std_credit_type'] = c_type
-                        st.session_state['std_credit_balance'] = c_bal
-                        st.session_state['std_status_msg'] = c_msg
-                        st.session_state['std_credit_checked_email'] = user_email
-                        if eligible:
-                            st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                    email_clean = user_email.strip().lower()
+                    existing_user = credit_service.sheets_service.get_user_by_email(email_clean)
+                    is_new_user = not existing_user
+                    user = credit_service.get_or_create_user(email_clean, user_name, referred_by=st.session_state.get("referred_by_code", ""))
+                    st.session_state['std_user_credit_obj'] = user
+                    eligible, c_type, c_bal, c_msg = credit_service.check_credit_eligibility(email_clean)
+                    st.session_state['std_is_eligible'] = eligible
+                    st.session_state['std_credit_type'] = c_type
+                    st.session_state['std_credit_balance'] = c_bal
+                    st.session_state['std_status_msg'] = c_msg
+                    st.session_state['std_credit_checked_email'] = user_email
+                    if eligible:
+                        st.success("ตรวจสอบข้อมูลเครดิตสำเร็จ!")
+                        if is_new_user:
+                            push_event_to_gtm("signup_complete", {"user_mode": "standard"})
+                            NotificationService.send_event_notification("signup_complete", email_clean)
                 except Exception as e:
                     st.error(f"ไม่สามารถเชื่อมต่อฐานข้อมูลเครดิตได้ชั่วคราว: {e}")
                     st.session_state['std_is_eligible'] = False
